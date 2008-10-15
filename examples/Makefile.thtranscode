@@ -1,0 +1,13 @@
+SOURCES=thtranscode.ml
+RESULT=thtranscode
+INCDIRS=../src ../../ocaml-ogg/src
+LIBS=unix ogg theora
+OCAMLC = /usr/bin/ocamlc -g 
+OCAMLOPT = /usr/bin/ocamlopt -g 
+
+all: nc
+
+test: all
+	./thencode
+
+include OCamlMakefile

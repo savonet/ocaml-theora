@@ -1,0 +1,11 @@
+SOURCES=thencode.ml
+RESULT=thencode
+INCDIRS=../src ../../ocaml-ogg/src
+LIBS=unix ogg theora
+
+all: nc
+
+test: all
+	./thencode
+
+include OCamlMakefile
