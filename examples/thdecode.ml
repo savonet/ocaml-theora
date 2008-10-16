@@ -35,7 +35,7 @@ let () =
     if not (Ogg.Page.bos page) then raise Not_found ;
     (** Create a stream with this ID *)
     let serial = Ogg.Page.serialno page in
-    Printf.printf "Testing stream %d\n" serial ;
+    Printf.printf "Testing stream %nx\n" serial ;
     let os = Ogg.Stream.create ~serial () in
     Ogg.Stream.put_page os page ;
     let packet = Ogg.Stream.get_packet os in
@@ -63,7 +63,7 @@ let () =
   in
   let serial,os,(t,info,vendor,comments) = init () in
   Printf.printf 
-     "Ogg logical stream %d is Theora %dx%d %.02f fps video\n"
+     "Ogg logical stream %nx is Theora %dx%d %.02f fps video\n"
      serial info.width info.height
      ((float_of_int info.fps_numerator) /. (float_of_int info.fps_denominator)) ;
   Printf.printf "Encoded frame content is %dx%d with %dx%d offset\n"
