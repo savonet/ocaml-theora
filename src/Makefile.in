@@ -28,6 +28,7 @@ RESULT = theora
 OCAMLDOCFLAGS = -stars
 LIBINSTALL_FILES = $(wildcard *.mli *.cmi *.cma *.cmxa *.cmx *.a *.so)
 INCDIRS = @OCAMLOGG_INC@
+LIBS = bigarray
 ACLIBS = @LIBS@ @libtheora_LIBS@
 CLIBS = $(ACLIBS:-l%=%)
 LDFLAGS = @LDFLAGS@ @libtheora_LDFLAGS@

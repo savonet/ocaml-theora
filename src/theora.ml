@@ -90,15 +90,19 @@ type info =
       pixelformat : pixelformat;
     }
 
+type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
 type yuv_buffer =
     {
       y_width : int;
       y_height : int;
+      y_stride : int;
       uv_width : int;
       uv_height : int;
-      y : string;
-      u : string;
-      v : string;
+      uv_stride : int;
+      y : data_buffer;
+      u : data_buffer;
+      v : data_buffer;
     }
 
 type comment
@@ -137,9 +141,9 @@ struct
 
   external create : Ogg.Stream.packet -> Ogg.Stream.packet -> Ogg.Stream.packet -> t*info*(string array) = "ocaml_theora_create"
 
-  let create p1 p2 p3 = 
+  let create p1 p2 p3 =
     let t,info,comment = create p1 p2 p3 in
-    let vendor,comment = 
+    let vendor,comment =
       match Array.to_list comment with
         | e :: l -> e,l
         | [] -> "",[]
@@ -154,7 +158,4 @@ struct
     t,info,vendor,(List.map split comment)
 
   external get_yuv : t -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
-
 end
-
-

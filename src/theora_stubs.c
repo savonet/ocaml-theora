@@ -19,6 +19,7 @@
  */
 
 #include <caml/alloc.h>
+#include <caml/bigarray.h>
 #include <caml/callback.h>
 #include <caml/custom.h>
 #include <caml/fail.h>
@@ -190,40 +191,33 @@ static value val_of_info(theora_info *ti)
   CAMLreturn(v);
 }
 
-static char *caml_memcpy_string(value v)
+static yuv_buffer *yuv_of_val(value v, yuv_buffer *yb)
 {
-  int len = caml_string_length(v);
-  char *ret = malloc(len);
-
-  memcpy(ret,String_val(v),len);
-
-  return ret;
-}
-
-static yuv_buffer *yuv_of_val(value v)
-{
-    yuv_buffer *yb = malloc(sizeof(yuv_buffer));
-
     int i = 0;
+    struct caml_ba_array *ba;
     yb->y_width = Int_val(Field(v, i++));
     yb->y_height = Int_val(Field(v, i++));
-    yb->y_stride = yb->y_width;
+    yb->y_stride = Int_val(Field(v, i++));
     yb->uv_width = Int_val(Field(v, i++));
     yb->uv_height = Int_val(Field(v, i++));
-    yb->uv_stride = yb->uv_width;
-    yb->y = (unsigned char *)caml_memcpy_string(Field(v, i++));
-    yb->u = (unsigned char *)caml_memcpy_string(Field(v, i++));
-    yb->v = (unsigned char *)caml_memcpy_string(Field(v, i++));
+    yb->uv_stride = Int_val(Field(v, i++));
+
+    ba = Caml_ba_array_val(Field(v, i++));
+    if (ba->dim[0] != yb->y_stride*yb->y_height)
+      caml_raise_constant(*caml_named_value("theora_exn_inval"));    
+    yb->y = (unsigned char *)ba->data;
+
+    ba = Caml_ba_array_val(Field(v, i++));
+    if (ba->dim[0] != yb->uv_stride*yb->uv_height)
+      caml_raise_constant(*caml_named_value("theora_exn_inval"));
+    yb->u = (unsigned char *)ba->data;
+
+    ba = Caml_ba_array_val(Field(v, i++));
+    if (ba->dim[0] != yb->uv_stride*yb->uv_height)
+      caml_raise_constant(*caml_named_value("theora_exn_inval"));
+    yb->v = (unsigned char *)ba->data;
 
     return yb;
-}
-
-static void yuv_free(yuv_buffer *yuv)
-{
-  free(yuv->y);
-  free(yuv->u);
-  free(yuv->v);
-  free(yuv);
 }
 
 /* The result must be freed afterwards! */
@@ -233,28 +227,38 @@ static value val_of_yuv(yuv_buffer *yb)
   CAMLparam0();
   CAMLlocal4 (ret,y,u,v);
   int i = 0;
-  int j;
-  ret = caml_alloc_tuple(7);
+  intnat len;
+  ret = caml_alloc_tuple(9);
+  unsigned char *data;
 
   Store_field (ret, i++, Val_int(yb->y_width));
   Store_field (ret, i++, Val_int(yb->y_height));
+  Store_field (ret, i++, Val_int(yb->y_stride));
   Store_field (ret, i++, Val_int(yb->uv_width));
   Store_field (ret, i++, Val_int(yb->uv_height));
+  Store_field (ret, i++, Val_int(yb->uv_stride));
 
-  
-  y = caml_alloc_string(yb->y_width*yb->y_height);
-  for (j=0;j<yb->y_height;j++)
-    memcpy(String_val(y)+yb->y_width*j,yb->y+yb->y_stride*j,yb->y_width);
+  len = yb->y_stride*yb->y_height;
+  data = malloc(len);
+  if (data == NULL)
+    caml_failwith("malloc");
+  y = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
+  memcpy(data,yb->y,len);
   Store_field (ret, i++, y);
 
-  u = caml_alloc_string(yb->uv_width*yb->uv_height);
-  for (j=0;j<yb->uv_height;j++)
-    memcpy(String_val(u)+yb->uv_width*j,yb->u+yb->uv_stride*j,yb->uv_width);
+  len = yb->uv_stride*yb->uv_height;
+  data = malloc(len);
+  if (data == NULL)
+    caml_failwith("malloc");
+  u = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
+  memcpy(data,yb->u,len);
   Store_field (ret, i++, u);
 
-  v = caml_alloc_string(yb->uv_stride*yb->uv_height);
-  for (j=0;j<yb->uv_height;j++)
-    memcpy(String_val(v)+yb->uv_width*j,yb->v+yb->uv_stride*j,yb->uv_width);
+  data = malloc(len);
+  if (data == NULL)
+    caml_failwith("malloc");
+  v = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
+  memcpy(data,yb->v,len);
   Store_field (ret, i++, v);
 
   CAMLreturn(ret);
@@ -346,7 +350,7 @@ CAMLprim value ocaml_theora_encode_page(value t_state, value o_stream_state, val
   CAMLlocal1(v);
   ogg_stream_state *os = Stream_state_val(o_stream_state);
   state_t *state = Theora_state_val(t_state);
-  yuv_buffer *yb;
+  yuv_buffer yb;
   /* You'll go to Hell for using static variables */
   ogg_page og;
   ogg_packet op;
@@ -365,12 +369,12 @@ CAMLprim value ocaml_theora_encode_page(value t_state, value o_stream_state, val
 
     /* Encode the theora packet. */
     v = caml_callback(feed, Val_unit);
-    yb = yuv_of_val(v);
+    yuv_of_val(v,&yb);
 
     caml_enter_blocking_section();
-    ret = theora_encode_YUVin(&state->ts, yb);
+    ret = theora_encode_YUVin(&state->ts, &yb);
     caml_leave_blocking_section();
-    yuv_free(yb);
+
     if (ret != 0)
       /* TODO:
        * \retval OC_EINVAL Encoder is not ready, or is finished.
@@ -397,19 +401,18 @@ CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, v
   CAMLlocal1(v);
   state_t *state = Theora_state_val(t_state);
   ogg_stream_state *os = Stream_state_val(o_stream_state);
-  yuv_buffer *yb;
+  yuv_buffer yb;
   ogg_packet op;
   int ret;
 
   assert(!ogg_stream_eos(os)); /* TODO: raise End_of_stream */
 
   /* Encode the theora packet. */
-  yb = yuv_of_val(frame);
+  yuv_of_val(frame,&yb);
 
   caml_enter_blocking_section();
-  ret = theora_encode_YUVin(&state->ts, yb);
+  ret = theora_encode_YUVin(&state->ts, &yb);
   caml_leave_blocking_section();
-  yuv_free(yb);
   if (ret != 0)
     /* TODO:
      * \retval OC_EINVAL Encoder is not ready, or is finished.
@@ -548,7 +551,6 @@ CAMLprim value ocaml_theora_decode_YUVout(value decoder, value _os)
   state_t *state = Theora_state_val(decoder);
   yuv_buffer yb;
   ogg_packet op;
-  
 
   if (ogg_stream_packetout(os,&op) == 0)
     caml_raise_constant(*caml_named_value("ogg_exn_not_enough_data"));

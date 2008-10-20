@@ -88,7 +88,7 @@ type pixelformat =
   *
   * This type is private since it needs private theora parameters.
   * Une the [new_info] function to create an empty one.*)
-type info = 
+type info =
     {
       width : int; (** encoded frame width (should be divisible by 16) *)
       height : int; (** encoded frame height (should be divisible by 16) *)
@@ -123,6 +123,8 @@ type info =
       pixelformat : pixelformat; (** chroma subsampling mode to expect *)
     }
 
+type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
 (**
   * A YUV buffer for passing uncompressed frames to and from the codec.
   * This holds a Y'CbCr frame in planar format. The CbCr planes can be
@@ -141,11 +143,13 @@ type yuv_buffer =
     {
       y_width : int; (** Width of the Y' luminance plane *)
       y_height : int; (** Height of the luminance plane *)
+      y_stride : int; (** Lenth, in bytes, per line *)
       uv_width : int; (** Width of the Cb and Cr chroma planes *)
       uv_height : int; (** Height of the chroma planes *)
-      y : string; (** luminance data *)
-      u : string; (** Cb data *)
-      v : string; (** Cr data *)
+      uv_stride : int; (** Length, in bytes, per line *)
+      y : data_buffer; (** luminance data *)
+      u : data_buffer; (** Cb data *)
+      v : data_buffer; (** Cr data *)
     }
 
 (** {2 Encoding} *)
