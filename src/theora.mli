@@ -187,6 +187,9 @@ sig
 
   (** Encode a buffer. *)
   val encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit
+
+  (** Set end of stream *)
+  val eos : t -> Ogg.Stream.t -> unit
 end
 
 module Decoder :

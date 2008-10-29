@@ -270,6 +270,8 @@ typedef struct state_t
 {
   theora_state ts;
   theora_info ti;
+  /* Used for encoding only */
+  ogg_int64_t nframes;
 } state_t;
 
 #define Theora_state_val(v) (*((state_t**)Data_custom_val(v)))
@@ -300,7 +302,7 @@ CAMLprim value ocaml_theora_encode_init(value info)
   CAMLlocal1(ans);
   int ret;
   state_t *state = malloc(sizeof(state_t));
-
+  state->nframes = 0;
   theora_info_init(&state->ti);
   info_of_val(info, &state->ti);
   ret = theora_encode_init(&state->ts, &state->ti);
@@ -374,6 +376,7 @@ CAMLprim value ocaml_theora_encode_page(value t_state, value o_stream_state, val
     caml_enter_blocking_section();
     ret = theora_encode_YUVin(&state->ts, &yb);
     caml_leave_blocking_section();
+    state->nframes++;
 
     if (ret != 0)
       /* TODO:
@@ -413,6 +416,7 @@ CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, v
   caml_enter_blocking_section();
   ret = theora_encode_YUVin(&state->ts, &yb);
   caml_leave_blocking_section();
+  state->nframes++;
   if (ret != 0)
     /* TODO:
      * \retval OC_EINVAL Encoder is not ready, or is finished.
@@ -434,6 +438,25 @@ CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, v
   CAMLreturn(Val_unit);
 }
 
+CAMLprim value ocaml_theora_encode_eos(value t_state, value o_stream_state)
+{
+  CAMLparam2(t_state,o_stream_state);
+  state_t *state = Theora_state_val(t_state);
+  ogg_stream_state *os = Stream_state_val(o_stream_state);
+  ogg_packet op;
+  
+  op.packet = (unsigned char *)NULL;
+  op.bytes = 0;
+  op.b_o_s = 0;
+  op.e_o_s = 1;
+  op.granulepos = state->ts.granulepos+1;
+  /* Header contains 3 packets. */
+  op.packetno = 3+state->nframes+1;
+  ogg_stream_packetin(os, &op);
+
+  CAMLreturn(Val_unit);   
+
+}
 
 CAMLprim value ocaml_theora_encode_comments(value o_stream_state, value comments)
 {
@@ -483,6 +506,8 @@ CAMLprim value ocaml_theora_create(value packet1, value packet2, value packet3)
   CAMLparam3(packet1,packet2,packet3);
   CAMLlocal4(ret,t,comment,tmp);
   state_t *state = malloc(sizeof(state_t));
+  /* Not used for decoding.. */
+  state->nframes = 0;
   theora_comment tc;
   ogg_packet *op1 = Packet_val(packet1);
   ogg_packet *op2 = Packet_val(packet2);

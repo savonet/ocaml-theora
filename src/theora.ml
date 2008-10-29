@@ -131,6 +131,8 @@ struct
   external encode_page : t -> Ogg.Stream.t -> (unit -> yuv_buffer) -> Ogg.Page.t = "ocaml_theora_encode_page"
 
   external encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit = "ocaml_theora_encode_buffer"
+
+  external eos : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_eos"
 end
 
 module Decoder =
