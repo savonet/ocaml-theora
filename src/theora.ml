@@ -161,3 +161,21 @@ struct
 
   external get_yuv : t -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
 end
+
+module Skeleton = 
+struct
+
+  external fisbone : Nativeint.t -> info -> Int64.t -> string -> Ogg.Stream.packet = "ocaml_theora_skeleton_fisbone"
+
+  let fisbone ?(start_granule=Int64.zero)
+              ?(headers=["Content-type","video/theora"])
+              ~serialno ~info () =
+    let concat s (h,v) =
+      Printf.sprintf "%s%s: %s\r\n" s h v
+    in
+    let s =
+      List.fold_left concat "" headers
+    in
+    fisbone serialno info start_granule s 
+
+end

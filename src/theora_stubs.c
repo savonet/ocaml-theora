@@ -588,3 +588,71 @@ CAMLprim value ocaml_theora_decode_YUVout(value decoder, value _os)
 
   CAMLreturn(val_of_yuv(&yb));
 }
+
+/* Ogg skeleton interface */
+
+/* Wrappers */
+static void write32le(unsigned char *ptr,ogg_uint32_t v)
+{
+  ptr[0]=v&0xff;
+  ptr[1]=(v>>8)&0xff;
+  ptr[2]=(v>>16)&0xff;
+  ptr[3]=(v>>24)&0xff;
+}
+
+static void write64le(unsigned char *ptr,ogg_int64_t v)
+{
+  ogg_uint32_t hi=v>>32;
+  ptr[0]=v&0xff;
+  ptr[1]=(v>>8)&0xff;
+  ptr[2]=(v>>16)&0xff;
+  ptr[3]=(v>>24)&0xff;
+  ptr[4]=hi&0xff;
+  ptr[5]=(hi>>8)&0xff;
+  ptr[6]=(hi>>16)&0xff;
+  ptr[7]=(hi>>24)&0xff;
+}
+
+/* Values from http://xiph.org/ogg/doc/skeleton.html */
+#define FISBONE_IDENTIFIER "fisbone\0"
+#define FISBONE_MESSAGE_HEADER_OFFSET 44
+#define FISBONE_SIZE 52
+
+/* Code from theorautils.c in ffmpeg2theora */
+CAMLprim value ocaml_theora_skeleton_fisbone(value serial, value info, value start, value content)
+{
+  CAMLparam4(serial,info,start,content);
+  CAMLlocal1(packet);
+  ogg_packet op;
+  theora_info ti;
+  info_of_val(info,&ti); 
+  int len = FISBONE_SIZE+caml_string_length(content);
+
+  memset (&op, 0, sizeof (op));
+  op.packet = malloc(len);
+  if (op.packet == NULL)
+    caml_failwith("malloc");
+
+  memset (op.packet, 0, len);
+  /* it will be the fisbone packet for the theora video */
+  memcpy (op.packet, FISBONE_IDENTIFIER, 8); /* identifier */
+  write32le(op.packet+8, FISBONE_MESSAGE_HEADER_OFFSET); /* offset of the message header fields */
+  write32le(op.packet+12, Nativeint_val(serial)); /* serialno of the theora stream */
+  write32le(op.packet+16, 3); /* number of header packets */
+  /* granulerate, temporal resolution of the bitstream in samples/microsecond */
+  write64le(op.packet+20, (ogg_int64_t)ti.fps_numerator); /* granulrate numerator */
+  write64le(op.packet+28, (ogg_int64_t)ti.fps_denominator); /* granulrate denominator */
+  write64le(op.packet+36, (ogg_int64_t)Int64_val(start)); /* start granule */
+  write32le(op.packet+44, 0); /* preroll, for theora its 0 */
+  *(op.packet+48) = theora_granule_shift (&ti); /* granule shift */
+  memcpy(op.packet+FISBONE_SIZE, String_val(content), caml_string_length(content)); /* message header field */
+
+  op.b_o_s = 0;
+  op.e_o_s = 0;
+  op.bytes = len;
+
+  packet = value_of_packet(&op);
+  free(op.packet);
+  CAMLreturn(packet);
+}
+
