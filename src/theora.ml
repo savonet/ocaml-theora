@@ -107,7 +107,9 @@ type yuv_buffer =
 
 type comment
 
+(* Not yet implemented..
 external create_comment : (string*string) array -> comment = "ocaml_theora_comment_create"
+*)
 
 let encoder_tag = "ocaml-theora by the savonet team (http://savonet.sf.net/)"
 
