@@ -134,6 +134,10 @@ struct
 
   external encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit = "ocaml_theora_encode_buffer"
 
+  external time_of_granulepos : t -> Int64.t -> Nativeint.t = "ocaml_theora_encoder_time_of_granulepos"
+
+  external frames_of_granulepos : t -> Int64.t -> Int64.t = "ocaml_theora_encoder_frame_of_granulepos"
+
   external eos : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_eos"
 end
 

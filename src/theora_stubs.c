@@ -319,6 +319,22 @@ CAMLprim value ocaml_theora_encode_init(value info)
   CAMLreturn(ans);
 }
 
+CAMLprim value ocaml_theora_encoder_frame_of_granulepos(value t_state, value gpos)
+{
+  CAMLparam2(t_state,gpos);
+  state_t *state = Theora_state_val(t_state);
+  ogg_int64_t granulepos = (ogg_int64_t)Int64_val(gpos);
+  CAMLreturn(caml_copy_int64((int64)theora_granule_frame(&state->ts,granulepos)));
+}
+
+CAMLprim value ocaml_theora_encoder_time_of_granulepos(value t_state, value gpos)
+{
+  CAMLparam2(t_state,gpos);
+  state_t *state = Theora_state_val(t_state);
+  ogg_int64_t granulepos = (ogg_int64_t)Int64_val(gpos);
+  CAMLreturn(caml_copy_nativeint((double)theora_granule_time(&state->ts,granulepos)));
+}
+
 CAMLprim value ocaml_theora_encode_header(value t_state, value o_stream_state)
 {
   CAMLparam2(t_state, o_stream_state);

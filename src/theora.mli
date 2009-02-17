@@ -188,6 +188,15 @@ sig
   (** Encode a buffer. *)
   val encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit
 
+  (** Convert a granulepos to absolute time in seconds. The granulepos is
+    * interpreted in the context of a given theora_state handle, and gives
+    * the end time of a frame's presentation as used in Ogg mux ordering. *)
+  val time_of_granulepos : t -> Int64.t -> Nativeint.t
+
+  (** Convert a granulepos to an absolute frame index, starting at 0.
+    * The granulepos is interpreted in the context of a given theora_state handle. *)
+  val frames_of_granulepos : t -> Int64.t -> Int64.t
+
   (** Set end of stream *)
   val eos : t -> Ogg.Stream.t -> unit
 end
