@@ -232,7 +232,7 @@ end
 module Skeleton : 
 sig
 
-  (** Generate a vorbis fisbone packet with
+  (** Generate a theora fisbone packet with
     * these parameters, to use in an ogg skeleton.
     * Default value for [start_granule] is [Int64.zero],
     * Default value for [headers] is ["Content-type","video/theora"]
