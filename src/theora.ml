@@ -129,10 +129,18 @@ struct
 
   external encode_tables : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_tables"
 
-  (* TODO: encode page could be done in caml using encode_buffer. *)
-  external encode_page : t -> Ogg.Stream.t -> (unit -> yuv_buffer) -> Ogg.Page.t = "ocaml_theora_encode_page"
-
   external encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit = "ocaml_theora_encode_buffer"
+
+  let encode_page enc os generator = 
+    let rec f () =
+     try
+      let yuv = generator () in
+      encode_buffer enc os yuv;
+      Ogg.Stream.get_page os
+     with
+       | Ogg.Not_enough_data -> f ()
+    in
+    f ()
 
   external time_of_granulepos : t -> Int64.t -> Nativeint.t = "ocaml_theora_encoder_time_of_granulepos"
 

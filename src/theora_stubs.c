@@ -361,59 +361,6 @@ CAMLprim value ocaml_theora_encode_tables(value t_state, value o_stream_state)
   CAMLreturn(Val_unit);
 }
 
-/* Inspired of examples/encoder_example.c in theora sources. */
-CAMLprim value ocaml_theora_encode_page(value t_state, value o_stream_state, value feed)
-{
-  CAMLparam3(t_state, feed, o_stream_state);
-  CAMLlocal1(v);
-  ogg_stream_state *os = Stream_state_val(o_stream_state);
-  state_t *state = Theora_state_val(t_state);
-  yuv_buffer yb;
-  /* You'll go to Hell for using static variables */
-  ogg_page og;
-  ogg_packet op;
-  int ret;
-
-  /* Is there a video page flushed? If not, work until there is. */
-  while(1)
-  {
-    if(ogg_stream_pageout(os, &og) > 0)
-    {
-      CAMLreturn(value_of_page(&og));
-    }
-    assert(!ogg_stream_eos(os)); /* TODO: raise End_of_stream */
-
-    /* Read and process more video. */
-
-    /* Encode the theora packet. */
-    v = caml_callback(feed, Val_unit);
-    yuv_of_val(v,&yb);
-
-    caml_enter_blocking_section();
-    ret = theora_encode_YUVin(&state->ts, &yb);
-    caml_leave_blocking_section();
-    state->nframes++;
-
-    if (ret != 0)
-      /* TODO:
-       * \retval OC_EINVAL Encoder is not ready, or is finished.
-       * \retval -1 The size of the given frame differs from those previously input */
-      check_err(ret);
-
-    /* TODO: second argument should be 1 if it's the last frame. */
-    ret = theora_encode_packetout(&state->ts, 0, &op);
-    /* TODO:
-     * \retval 0 No internal storage exists OR no packet is ready
-     * \retval -1 The encoding process has completed
-     * \retval 1 Success */
-    if (ret != 1)
-      check_err(ret);
-
-    /* Put the packet in the ogg stream. */
-    ogg_stream_packetin(os, &op);
-  }
-}
-
 CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, value frame)
 {
   CAMLparam3(t_state, o_stream_state, frame);
