@@ -1,3 +1,7 @@
+0.2.0 ()
+=====
+* Binded 1.1 theora API.
+
 0.1.2 (14-10-2009)
 =====
 * Added support for --enable-debugging configure option

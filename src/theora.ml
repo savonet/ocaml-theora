@@ -1,5 +1,5 @@
 (*
- * Copyright 2007 Samuel Mimram
+ * Copyright 2007-2009 Samuel Mimram, Romain Beauxis
  *
  * This file is part of ocaml-theora.
  *
@@ -22,22 +22,31 @@
   * Functions for encoding theora files using libtheora.
   *
   * @author Samuel Mimram
+  * @author Romain Beauxis
   *)
 
 exception Internal_error
 exception Invalid_data
 exception Unknown_error of int
+exception Duplicate_frame
+exception Not_enough_data
+exception Done
+exception Not_initialized
 
 let () =
   Callback.register_exception "theora_exn_fault" Internal_error;
   Callback.register_exception "theora_exn_inval" Invalid_data;
-  Callback.register_exception "theora_exn_unknown" (Unknown_error 0)
+  Callback.register_exception "theora_exn_unknown" (Unknown_error 0) ;
+  Callback.register_exception "theora_exn_dup_frame" Duplicate_frame ;
+  Callback.register_exception "theora_exn_not_enough_data" Not_enough_data
 
 external version_string : unit -> string = "ocaml_theora_version_string"
 
+let version_string = version_string ()
+
 external version_number : unit -> int = "ocaml_theora_version_number"
 
-let version_number () =
+let version_number =
   let n = version_number () in
     n lsr 16,
     (n lsr 8) land 0xff,
@@ -57,38 +66,29 @@ type pixelformat =
 
 type info = 
     {
-      width : int;
-      height : int;
-      frame_width : int;
-      frame_height : int;
-      offset_x : int;
-      offset_y : int;
+      frame_width : int; (** The encoded frame width.  *)
+      frame_height : int; (** The encoded frame height. *) 
+      picture_width : int; (** The displayed picture width. *)
+      picture_height : int; (** The displayed picture height. *)
+      picture_x : int; (** The X offset of the displayed picture. *)
+      picture_y : int; (** The Y offset of the displayed picture. *)
+      colorspace : colorspace; (** The color space. *)
+      pixel_fmt  : pixelformat; (** The pixel format. *)
+      target_bitrate : int; (** The target bit-rate in bits per second. *)
+      quality        : int; (** The target quality level. *)
+      keyframe_granule_shift : int; (** The amount to shift to extract the last keyframe number from the granule position. *)
+      version_major : int;
+      version_minor : int;
+      version_subminor : int;
       fps_numerator : int;
       fps_denominator : int;
       aspect_numerator : int;
       aspect_denominator : int;
-      colorspace : colorspace;
-      target_bitrate : int;
-      quality : int;
-      quick_p : bool;
-
-      (* Decode only *)
-      version_major : int;
-      version_minor : int;
-      version_subminor : int;
-
-      (* Encode only *)
-      dropframes_p : bool;
-      keyframe_auto_p : bool;
-      keyframe_frequency : int;
-      keyframe_frequency_force : int;
-      keyframe_data_target_bitrate : int;
-      keyframe_auto_threshold : int;
-      keyframe_mindistance : int;
-      noise_sensitivity : int;
-      sharpness : int;
-      pixelformat : pixelformat;
     }
+
+external default_granule_shift : unit -> int = "ocaml_theora_default_granuleshift"
+
+let default_granule_shift = default_granule_shift ()
 
 type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
@@ -97,19 +97,16 @@ type yuv_buffer =
       y_width : int;
       y_height : int;
       y_stride : int;
-      uv_width : int;
-      uv_height : int;
-      uv_stride : int;
       y : data_buffer;
+      u_width : int;
+      u_height : int;
+      u_stride : int;
       u : data_buffer;
+      v_width : int;
+      v_height : int;
+      v_stride : int;
       v : data_buffer;
     }
-
-type comment
-
-(* Not yet implemented..
-external create_comment : (string*string) array -> comment = "ocaml_theora_comment_create"
-*)
 
 let encoder_tag = "ocaml-theora by the savonet team (http://savonet.sf.net/)"
 
@@ -117,17 +114,20 @@ module Encoder =
 struct
   type t
 
-  external create : info -> t = "ocaml_theora_encode_init"
+  external create : info -> (string*string) array -> t = "ocaml_theora_encode_init"
 
-  external encode_header : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_header"
+  let create info comments = 
+    let comments = ("ENCODER", encoder_tag)::comments in
+    create info (Array.of_list comments)
 
-  external encode_comments : Ogg.Stream.t -> (string*string) array -> unit = "ocaml_theora_encode_comments"
+  external encode_header : t -> Ogg.Stream.t -> bool = "ocaml_theora_encode_header"
 
-   let encode_comments stream comments =
-     let comments = ("ENCODER", encoder_tag)::comments in
-       encode_comments stream (Array.of_list comments)
-
-  external encode_tables : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_tables"
+  let encode_header enc os = 
+    let rec f () = 
+      if not (encode_header enc os) then
+        f ()
+    in
+    f ()
 
   external encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit = "ocaml_theora_encode_buffer"
 
@@ -151,29 +151,54 @@ end
 
 module Decoder =
 struct
-  type t
+  type decoder
+  type t = 
+    { 
+      dec : decoder ;
+      mutable init : bool
+    }
 
   external check : Ogg.Stream.packet -> bool = "caml_theora_check"
 
-  external create : Ogg.Stream.packet -> Ogg.Stream.packet -> Ogg.Stream.packet -> t*info*(string array) = "ocaml_theora_create"
+  external create : unit -> decoder = "ocaml_theora_create_dec"
 
-  let create p1 p2 p3 =
-    let t,info,comment = create p1 p2 p3 in
-    let vendor,comment =
-      match Array.to_list comment with
-        | e :: l -> e,l
-        | [] -> "",[]
-    in
-    let split s =
-      try
-        let pos = String.index s '=' in
-        String.sub s 0 pos,String.sub s (pos+1) ((String.length s) - pos - 1)
-      with
-        | Not_found -> "",s
-    in
-    t,info,vendor,(List.map split comment)
+  let create () = 
+    {
+      dec = create ();
+      init = false
+    }
 
-  external get_yuv : t -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
+  let is_ready dec = dec.init
+
+  external headerin : decoder -> Ogg.Stream.packet -> info*(string array) = "ocaml_theora_dec_headerin"
+
+  let headerin dec p = 
+    if dec.init then
+      raise Done
+    else
+      let info,comments = headerin dec.dec p in
+      let vendor,comments =
+        match Array.to_list comments with
+          | e :: l -> e,l
+          | [] -> "",[]
+      in
+      let split s =
+        try
+          let pos = String.index s '=' in
+          String.sub s 0 pos,String.sub s (pos+1) ((String.length s) - pos - 1)
+        with
+          | Not_found -> "",s
+      in
+      dec.init <- true ;
+      info,vendor,(List.map split comments)
+
+  external get_yuv : decoder -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
+
+  let get_yuv dec os = 
+    if not dec.init then
+      raise Not_initialized
+    else
+      get_yuv dec.dec os
 end
 
 module Skeleton = 

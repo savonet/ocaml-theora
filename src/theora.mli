@@ -1,5 +1,5 @@
 (*
- * Copyright 2007 Samuel Mimram
+ * Copyright 2007-2009 Samuel Mimram, Romain Beauxis
  *
  * This file is part of ocaml-theora.
  *
@@ -22,6 +22,7 @@
   * Functions for encoding theora files using libtheora.
   *
   * @author Samuel Mimram
+  * @author Romain Beauxis
   *)
 
 (** {2 Exceptions} *)
@@ -32,16 +33,26 @@ exception Internal_error
 exception Invalid_data
 (** An unhandled error happened. *)
 exception Unknown_error of int
+(** The decoded packet represented a dropped frame.
+  * The player can continue to display the current frame, 
+  * as the contents of the decoded frame buffer have not 
+  * changed. *)
+exception Duplicate_frame
+
+(** Exceptions used by the decoding module. *)
+exception Not_enough_data
+exception Done
+exception Not_initialized
 
 (** {2 General functions} *)
 
 (**
-  * Retrieve a human-readable string to identify the encoder vendor and version.
+  * Human-readable string to identify the encoder vendor and version.
   *)
-val version_string : unit -> string
+val version_string : string
 
-(** Retrive the major, minor and sub version numbers of the encoder. *)
-val version_number : unit -> int * int * int
+(** major, minor and sub version numbers of the encoder. *)
+val version_number : int * int * int
 
 (** {2 Types and datastructures} *)
 
@@ -65,63 +76,30 @@ type pixelformat =
   | PF_422 (** Horizonatal chroma subsampling by 2 (4:2:2) *)
   | PF_444 (** No chroma subsampling at all (4:4:4) *)
 
-(**
-  * Theora bitstream info.
-  * Contains the basic playback parameters for a stream,
-  * corresponds to the initial 'info' header packet.
-  *
-  * Encoded theora frames must be a multiple of 16 is size;
-  * this is what the width and height members represent. To
-  * handle other sizes, a crop rectangle is specified in
-  * [frame_height] and [frame_width], [offset_x] and [offset_y]. The
-  * offset and size should still be a multiple of 2 to avoid
-  * chroma sampling shifts. Offset values in this structure
-  * are measured from the upper left of the image.
-  *
-  * Frame rate, in frames per second, is stored as a rational
-  * fraction. So is the aspect ratio. Note that this refers
-  * to the aspect ratio of the frame pixels, not of the
-  * overall frame itself.
-  *
-  * See the example code for use of the other parameters and
-  * good default settings for the encoder parameters.
-  *
-  * This type is private since it needs private theora parameters.
-  * Une the [new_info] function to create an empty one.*)
+(** Theora bitstream info. *)
 type info =
     {
-      width : int; (** encoded frame width (should be divisible by 16) *)
-      height : int; (** encoded frame height (should be divisible by 16) *)
-      frame_width : int; (** display frame width *)
-      frame_height : int; (** display frame height *)
-      offset_x : int; (** horizontal offset of the displayed frame *)
-      offset_y : int; (** vertical offset of the displayed frame *)
-      fps_numerator : int; (** frame rate numerator *)
-      fps_denominator : int; (** frame rate denominator *)
-      aspect_numerator : int; (** pixel aspect ratio numerator *)
-      aspect_denominator : int; (** pixel aspect ratio denominator *)
-      colorspace : colorspace; (** colorspace *)
-      target_bitrate : int; (** nominal bitrate in bits per second (between 45kbps and 2000kbps) *)
-      quality : int; (** Nominal quality setting, (between 0 and 63) *)
-      quick_p : bool; (** Quick encode/decode *)
-
-      (** Decode only *)
+      frame_width : int; (** The encoded frame width.  *)
+      frame_height : int; (** The encoded frame height. *)
+      picture_width : int; (** The displayed picture width. *)
+      picture_height : int; (** The displayed picture height. *)
+      picture_x : int; (** The X offset of the displayed picture. *)
+      picture_y : int; (** The Y offset of the displayed picture. *)
+      colorspace : colorspace; (** The color space. *)
+      pixel_fmt  : pixelformat; (** The pixel format. *)
+      target_bitrate : int; (** The target bit-rate in bits per second. *)
+      quality        : int; (** The target quality level. *)
+      keyframe_granule_shift : int; (** The amount to shift to extract the last keyframe number from the granule position. *)
       version_major : int;
       version_minor : int;
       version_subminor : int;
-
-      (** Encode only *)
-      dropframes_p : bool;
-      keyframe_auto_p : bool;
-      keyframe_frequency : int;
-      keyframe_frequency_force : int; (** also used for decode init to get granpos shift correct *)
-      keyframe_data_target_bitrate : int;
-      keyframe_auto_threshold : int;
-      keyframe_mindistance : int;
-      noise_sensitivity : int;
-      sharpness : int;
-      pixelformat : pixelformat; (** chroma subsampling mode to expect *)
+      fps_numerator : int;
+      fps_denominator : int;
+      aspect_numerator : int;
+      aspect_denominator : int;
     }
+
+val default_granule_shift : int
 
 type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
@@ -141,15 +119,18 @@ type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray
   *)
 type yuv_buffer =
     {
-      y_width : int; (** Width of the Y' luminance plane *)
-      y_height : int; (** Height of the luminance plane *)
-      y_stride : int; (** Lenth, in bytes, per line *)
-      uv_width : int; (** Width of the Cb and Cr chroma planes *)
-      uv_height : int; (** Height of the chroma planes *)
-      uv_stride : int; (** Length, in bytes, per line *)
-      y : data_buffer; (** luminance data *)
-      u : data_buffer; (** Cb data *)
-      v : data_buffer; (** Cr data *)
+      y_width : int;
+      y_height : int;
+      y_stride : int;
+      y : data_buffer;
+      u_width : int;
+      u_height : int;
+      u_stride : int;
+      u : data_buffer;
+      v_width : int;
+      v_height : int;
+      v_stride : int;
+      v : data_buffer;
     }
 
 (** {2 Encoding} *)
@@ -160,25 +141,12 @@ sig
   type t
 
   (** Initialize a [state] handle for decoding. *)
-  val create : info -> t
+  val create : info -> (string*string) list -> t
 
   (**
-    * Request a packet containing the initial header.
-    * The header data is placed in an [Ogg.packet] value.
+    * Fills the given stream with the header packets.
     *)
   val encode_header : t -> Ogg.Stream.t -> unit
-
-  (**
-    * Encode a comment header packet from provided vendor name and metadata (i.e.
-    * a list of (tag, value) couples).
-    *)
-  val encode_comments : Ogg.Stream.t -> (string*string) list -> unit
-
-  (**
-    * Request a packet containing the codebook tables for the stream.
-    * The codebook data is placed in an [Ogg.packet] value.
-    *)
-  val encode_tables : t -> Ogg.Stream.t -> unit
 
   (**
     * Encode data until a page is filled.
@@ -214,10 +182,24 @@ sig
     * Raises [Ogg.Bad_data] if the stream does not contain theora data. *)
   val check : Ogg.Stream.packet -> bool
 
-  (** Initialize the decoding structure. Needs the first
-    * 3 packets of the logical stream. *)
-  val create : Ogg.Stream.packet -> Ogg.Stream.packet -> Ogg.Stream.packet 
-                  -> t*info*string*(string*string) list
+  (** Initialize the decoding structure. 
+    * The decoder should then be processed with [headerin]. *)
+  val create : unit -> t
+
+  (** Returns [true] is the given decoder was properly
+    * initialized using [headerin] *)
+  val is_ready : t -> bool
+
+  (** Add one packet from the stream and try to parse theora headers.
+    *
+    * Raises [Not_enought_data] is decoding header needs another packet.
+    *
+    * Raises [Done] if the decoder was already initialized. 
+    *
+    * This function should be called with the first packets of the stream
+    * until it returns the requested values. It may consume at most 5 packets
+    * (3 header packet, 1 additional packet and the initial video packet) *)
+  val headerin : t -> Ogg.Stream.packet -> info*string*((string*string) list)
 
  (**
    * Output the next available frame of decoded YUV data. 
@@ -225,7 +207,10 @@ sig
    * Raises [Ogg.Not_enough_data] if the Ogg.Stream.t which
    * has been used to initialize the handler does not contain
    * enought data. You should submit a new page to it, and 
-   * run this function again until it returns. *)
+   * run this function again until it returns. 
+   *
+   * Raises [Not_initialized] if the decoder was not properly
+   * initialized with [headerin]. *)
   val get_yuv : t -> Ogg.Stream.t -> yuv_buffer
 end
 

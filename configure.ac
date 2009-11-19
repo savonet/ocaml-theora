@@ -1,6 +1,6 @@
 
 # check for one particular file of the sources 
-AC_INIT(ocaml-theora, 0.1.2, savonet-users@lists.sourceforge.net)
+AC_INIT(ocaml-theora, 0.2.0, savonet-users@lists.sourceforge.net)
 
 VERSION=$PACKAGE_VERSION
 AC_MSG_RESULT([configuring $PACKAGE_STRING])
@@ -111,14 +111,20 @@ AC_PROG_CC()
 PKG_PROG_PKG_CONFIG()
 
 # PKG_CHECK_MODULES loses when you need --libs-only-[lL]
-if ! $PKG_CONFIG --exists theora; then
-        AC_MSG_ERROR([libtheora not found])
+if ! $PKG_CONFIG --exists theoradec; then
+        AC_MSG_ERROR([libtheoradec not found])
 fi
-libtheora_CFLAGS=`$PKG_CONFIG --cflags theora`
+if ! $PKG_CONFIG --exists theoraenc; then
+        AC_MSG_ERROR([libtheoraenc not found])
+fi
+libtheora_CFLAGS=`$PKG_CONFIG --cflags theoradec` 
+libtheora_CFLAGS="$libtheora_CFLAGS`$PKG_CONFIG --cflags theoraenc`"
 AC_SUBST([libtheora_CFLAGS])
-libtheora_LIBS=`$PKG_CONFIG --libs-only-l theora`
+libtheora_LIBS=`$PKG_CONFIG --libs-only-l theoradec`
+libtheora_LIBS="$libtheora_LIBS `$PKG_CONFIG --libs-only-l theoraenc`"
 AC_SUBST([libtheora_LIBS])
-libtheora_LDFLAGS=`$PKG_CONFIG --libs-only-L theora`
+libtheora_LDFLAGS=`$PKG_CONFIG --libs-only-L theoradec` 
+libtheora_LDFLAGS="$libtheora_LDFLAGS `$PKG_CONFIG --libs-only-L theoraenc`"
 AC_SUBST([libtheora_LDFLAGS])
 
 AC_ARG_WITH([ogg-dir],AC_HELP_STRING([--with-ogg-dir=path],

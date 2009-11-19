@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Samuel Mimram
+ * Copyright 2007-2009 Samuel Mimram and Romain Beauxis
  *
  * This file is part of ocaml-theora.
  *
@@ -31,7 +31,8 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include <theora/theora.h>
+#include <theora/theoraenc.h>
+#include <theora/theoradec.h>
 
 #include <ocaml-ogg.h>
 
@@ -44,16 +45,20 @@ static void check_err(int n)
     case 0:
       return;
 
-    case OC_FAULT:
+    case TH_EFAULT:
       caml_raise_constant(*caml_named_value("theora_exn_fault"));
 
-    case OC_EINVAL:
-    case OC_VERSION:
-    case OC_NEWPACKET:
-    case OC_BADPACKET:
-    case OC_NOTFORMAT:
-    case OC_BADHEADER:
+    /* TODO: finer-grained exc raising. */
+    case TH_EINVAL:
+    case TH_EVERSION:
+    case TH_EBADPACKET:
+    case TH_ENOTFORMAT:
+    case TH_EBADHEADER:
+    case TH_EIMPL:
       caml_raise_constant(*caml_named_value("theora_exn_inval"));
+
+    case TH_DUPFRAME:
+      caml_raise_constant(*caml_named_value("theora_exn_dup_frame"));
 
     default:
       caml_raise_with_arg(*caml_named_value("theora_exn_unknown"), Val_int(n));
@@ -64,52 +69,94 @@ static void check_err(int n)
 
 CAMLprim value ocaml_theora_version_string(value unit)
 {
-  return caml_copy_string(theora_version_string());
+  return caml_copy_string(th_version_string());
 }
 
 CAMLprim value ocaml_theora_version_number(value unit)
 {
-  return Val_int(theora_version_number());
+  return Val_int(th_version_number());
 }
 
 /***** Helper functions *****/
 
-static theora_colorspace cs_of_val(value v)
+static th_colorspace cs_of_val(value v)
 {
   switch(Int_val(v))
   {
     case 0:
-      return OC_CS_UNSPECIFIED;
+      return TH_CS_UNSPECIFIED;
 
     case 1:
-      return OC_CS_ITU_REC_470M;
+      return TH_CS_ITU_REC_470M;
 
     case 2:
-      return OC_CS_ITU_REC_470BG;
+      return TH_CS_ITU_REC_470BG;
 
     case 3:
-      return OC_CS_NSPACES;
+      return TH_CS_NSPACES;
 
     default:
       assert(0);
   }
 }
 
-static theora_pixelformat pf_of_val(value v)
+static value val_of_cs(th_colorspace c)
+{
+  switch(c)
+  {
+    case TH_CS_UNSPECIFIED:
+      return Int_val(0);
+
+    case TH_CS_ITU_REC_470M:
+      return Int_val(1);
+
+    case TH_CS_ITU_REC_470BG:
+      return Int_val(2);
+
+    case TH_CS_NSPACES:
+      return Int_val(3);
+
+    default:
+      assert(0);
+  }
+}
+
+static th_pixel_fmt pf_of_val(value v)
 {
   switch(Int_val(v))
   {
     case 0:
-      return OC_PF_420;
+      return TH_PF_420;
 
     case 1:
-      return OC_PF_RSVD;
+      return TH_PF_RSVD;
 
     case 2:
-      return OC_PF_422;
+      return TH_PF_422;
 
     case 3:
-      return OC_PF_444;
+      return TH_PF_444;
+
+    default:
+      assert(0);
+  }
+}
+
+static value val_of_pf(th_pixel_fmt p)
+{
+  switch(p)
+  {
+    case TH_PF_420:
+      return Int_val(0);
+
+    case TH_PF_RSVD:
+      return Int_val(1);
+
+    case TH_PF_422:
+      return Int_val(2);
+
+    case TH_PF_444:
+      return Int_val(3);
 
     default:
       assert(0);
@@ -118,203 +165,212 @@ static theora_pixelformat pf_of_val(value v)
 
 /* ti is *not* allocated: codec_setup may be allocated by 
  * theora_info_init and its memory lost. You better check what you need */
-static theora_info *info_of_val(value v, theora_info *ti)
+static th_info *info_of_val(value v, th_info *ti)
 {
   int i = 0;
 
-  ti->width = Int_val(Field(v, i++));
-  ti->height = Int_val(Field(v, i++));
   ti->frame_width = Int_val(Field(v, i++));
   ti->frame_height = Int_val(Field(v, i++));
-  ti->offset_x = Int_val(Field(v, i++));
-  ti->offset_y = Int_val(Field(v, i++));
+  ti->pic_width = Int_val(Field(v, i++));
+  ti->pic_height = Int_val(Field(v, i++));
+  ti->pic_x = Int_val(Field(v, i++));
+  ti->pic_y = Int_val(Field(v, i++));
+  ti->colorspace = cs_of_val(Field(v, i++));
+  ti->pixel_fmt = pf_of_val(Field(v, i++));
+  ti->target_bitrate = Int_val(Field(v, i++));
+  ti->quality = Int_val(Field(v, i++));
+  ti->keyframe_granule_shift = Int_val(Field(v, i++));
+  ti->version_major = Int_val(Field(v, i++));
+  ti->version_minor = Int_val(Field(v, i++));
+  ti->version_subminor = Int_val(Field(v, i++));
   ti->fps_numerator = Int_val(Field(v, i++));
   ti->fps_denominator = Int_val(Field(v, i++));
   ti->aspect_numerator = Int_val(Field(v, i++));
   ti->aspect_denominator = Int_val(Field(v, i++));
-  ti->colorspace = cs_of_val(Field(v, i++));
-  ti->target_bitrate = Int_val(Field(v, i++));
-  ti->quality = Int_val(Field(v, i++));
-  ti->quick_p = Bool_val(Field(v, i++));
-  ti->version_major = Int_val(Field(v, i++));
-  ti->version_minor = Int_val(Field(v, i++));
-  ti->version_subminor = Int_val(Field(v, i++));
-  ti->dropframes_p = Bool_val(Field(v, i++));
-  ti->keyframe_auto_p = Bool_val(Field(v, i++));
-  ti->keyframe_frequency = Int_val(Field(v, i++));
-  ti->keyframe_frequency_force = Int_val(Field(v, i++));
-  ti->keyframe_data_target_bitrate = Int_val(Field(v, i++));
-  ti->keyframe_auto_threshold = Int_val(Field(v, i++));
-  ti->keyframe_mindistance = Int_val(Field(v, i++));
-  ti->noise_sensitivity = Int_val(Field(v, i++));
-  ti->sharpness = Int_val(Field(v, i++));
-  ti->pixelformat = pf_of_val(Field(v, i++));
 
   return ti;
 }
 
 
-static value val_of_info(theora_info *ti)
+static value val_of_info(th_info *ti)
 {
   CAMLparam0();
   CAMLlocal1 (v);
   int i = 0;
-  v = caml_alloc_tuple(27);
-  Store_field (v, i++, Val_int(ti->width));
-  Store_field (v, i++, Val_int(ti->height));
+  v = caml_alloc_tuple(18);
   Store_field (v, i++, Val_int(ti->frame_width));
   Store_field (v, i++, Val_int(ti->frame_height));
-  Store_field (v, i++, Val_int(ti->offset_x));
-  Store_field (v, i++, Val_int(ti->offset_y));
+  Store_field (v, i++, Val_int(ti->pic_width));
+  Store_field (v, i++, Val_int(ti->pic_height));
+  Store_field (v, i++, Val_int(ti->pic_x));
+  Store_field (v, i++, Val_int(ti->pic_y));
+  Store_field (v, i++, val_of_cs(ti->colorspace));
+  Store_field (v, i++, val_of_pf(ti->pixel_fmt));
+  Store_field (v, i++, Val_int(ti->target_bitrate));
+  Store_field (v, i++, Val_int(ti->quality));
+  Store_field (v, i++, Val_int(ti->keyframe_granule_shift));
+  Store_field (v, i++, Val_int(ti->version_major));
+  Store_field (v, i++, Val_int(ti->version_minor));
+  Store_field (v, i++, Val_int(ti->version_subminor));
   Store_field (v, i++, Val_int(ti->fps_numerator));
   Store_field (v, i++, Val_int(ti->fps_denominator));
   Store_field (v, i++, Val_int(ti->aspect_numerator));
   Store_field (v, i++, Val_int(ti->aspect_denominator));
-  Store_field (v, i++, Val_int(ti->colorspace));
-  Store_field (v, i++, Val_int(ti->target_bitrate));
-  Store_field (v, i++, Val_int(ti->quality));
-  Store_field (v, i++, Val_bool(ti->quick_p));
-  Store_field (v, i++, Val_int(ti->version_major));
-  Store_field (v, i++, Val_int(ti->version_minor));
-  Store_field (v, i++, Val_int(ti->version_subminor));
-  Store_field (v, i++, Val_bool(ti->dropframes_p));
-  Store_field (v, i++, Val_bool(ti->keyframe_auto_p));
-  Store_field (v, i++, Val_int(ti->keyframe_frequency));
-  Store_field (v, i++, Val_int(ti->keyframe_frequency_force));
-  Store_field (v, i++, Val_int(ti->keyframe_data_target_bitrate));
-  Store_field (v, i++, Val_int(ti->keyframe_auto_threshold));
-  Store_field (v, i++, Val_int(ti->keyframe_mindistance));
-  Store_field (v, i++, Val_int(ti->noise_sensitivity));
-  Store_field (v, i++, Val_int(ti->sharpness));
-  Store_field (v, i++, Val_int(ti->pixelformat));
 
   CAMLreturn(v);
 }
 
-static yuv_buffer *yuv_of_val(value v, yuv_buffer *yb)
+static void yuv_of_val(value v, th_ycbcr_buffer buffer)
 {
     int i = 0;
     struct caml_ba_array *ba;
-    yb->y_width = Int_val(Field(v, i++));
-    yb->y_height = Int_val(Field(v, i++));
-    yb->y_stride = Int_val(Field(v, i++));
-    yb->uv_width = Int_val(Field(v, i++));
-    yb->uv_height = Int_val(Field(v, i++));
-    yb->uv_stride = Int_val(Field(v, i++));
 
+    /* Y plane */
+    buffer[0].width = Int_val(Field(v, i++));
+    buffer[0].height = Int_val(Field(v, i++));
+    buffer[0].stride = Int_val(Field(v, i++));
     ba = Caml_ba_array_val(Field(v, i++));
-    if (ba->dim[0] != yb->y_stride*yb->y_height)
-      caml_raise_constant(*caml_named_value("theora_exn_inval"));    
-    yb->y = (unsigned char *)ba->data;
-
-    ba = Caml_ba_array_val(Field(v, i++));
-    if (ba->dim[0] != yb->uv_stride*yb->uv_height)
+    if (ba->dim[0] != buffer[0].stride*buffer[0].height)
       caml_raise_constant(*caml_named_value("theora_exn_inval"));
-    yb->u = (unsigned char *)ba->data;
+    buffer[0].data = (unsigned char *)ba->data;
 
+    /* Cb plane */
+    buffer[1].width = Int_val(Field(v, i++));
+    buffer[1].height = Int_val(Field(v, i++));
+    buffer[1].stride = Int_val(Field(v, i++));
     ba = Caml_ba_array_val(Field(v, i++));
-    if (ba->dim[0] != yb->uv_stride*yb->uv_height)
+    if (ba->dim[0] != buffer[1].stride*buffer[1].height)
       caml_raise_constant(*caml_named_value("theora_exn_inval"));
-    yb->v = (unsigned char *)ba->data;
+    buffer[1].data = (unsigned char *)ba->data;
 
-    return yb;
+    /* Cr plane */
+    buffer[2].width = Int_val(Field(v, i++));
+    buffer[2].height = Int_val(Field(v, i++));
+    buffer[2].stride = Int_val(Field(v, i++));
+    ba = Caml_ba_array_val(Field(v, i++));
+    if (ba->dim[0] != buffer[2].stride*buffer[2].height)
+      caml_raise_constant(*caml_named_value("theora_exn_inval"));
+    buffer[2].data = (unsigned char *)ba->data;
+
+    return;
 }
 
 /* The result must be freed afterwards! */
 /* This should not be called in a blocking section. */
-static value val_of_yuv(yuv_buffer *yb)
+static value val_of_yuv(th_ycbcr_buffer buffer)
 {
   CAMLparam0();
   CAMLlocal4 (ret,y,u,v);
   int i = 0;
   intnat len;
-  ret = caml_alloc_tuple(9);
+  ret = caml_alloc_tuple(12);
   unsigned char *data;
 
-  Store_field (ret, i++, Val_int(yb->y_width));
-  Store_field (ret, i++, Val_int(yb->y_height));
-  Store_field (ret, i++, Val_int(yb->y_stride));
-  Store_field (ret, i++, Val_int(yb->uv_width));
-  Store_field (ret, i++, Val_int(yb->uv_height));
-  Store_field (ret, i++, Val_int(yb->uv_stride));
-
-  len = yb->y_stride*yb->y_height;
+  /* Y plane */
+  Store_field (ret, i++, Val_int(buffer[0].width));
+  Store_field (ret, i++, Val_int(buffer[0].height));
+  Store_field (ret, i++, Val_int(buffer[0].stride));
+  len = buffer[0].stride*buffer[0].height;
   data = malloc(len);
   if (data == NULL)
     caml_failwith("malloc");
   y = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
-  memcpy(data,yb->y,len);
+  memcpy(data,buffer[0].data,len);
   Store_field (ret, i++, y);
 
-  len = yb->uv_stride*yb->uv_height;
+  /* Cb plane */
+  Store_field (ret, i++, Val_int(buffer[1].width));
+  Store_field (ret, i++, Val_int(buffer[1].height));
+  Store_field (ret, i++, Val_int(buffer[1].stride));
+  len = buffer[1].stride*buffer[1].height;
   data = malloc(len);
   if (data == NULL)
     caml_failwith("malloc");
   u = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
-  memcpy(data,yb->u,len);
+  memcpy(data,buffer[1].data,len);
   Store_field (ret, i++, u);
 
+  /* Cr plane */
+  Store_field (ret, i++, Val_int(buffer[2].width));
+  Store_field (ret, i++, Val_int(buffer[2].height));
+  Store_field (ret, i++, Val_int(buffer[2].stride));
+  len = buffer[2].stride*buffer[2].height;
   data = malloc(len);
   if (data == NULL)
     caml_failwith("malloc");
   v = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
-  memcpy(data,yb->v,len);
+  memcpy(data,buffer[2].data,len);
   Store_field (ret, i++, v);
 
   CAMLreturn(ret);
 }
 
-/***** State *****/
-
-typedef struct state_t
+CAMLprim value ocaml_theora_default_granuleshift(value unit)
 {
-  theora_state ts;
-  theora_info ti;
-  /* Used for encoding only */
-  ogg_int64_t nframes;
-} state_t;
+  CAMLparam0();
+  th_info info;
+  th_info_init(&info);
+  int ret = info.keyframe_granule_shift;
+  th_info_clear(&info);
+  CAMLreturn(Int_val(ret)); 
+}
 
-#define Theora_state_val(v) (*((state_t**)Data_custom_val(v)))
+/** Encoding API **/
 
-static void finalize_state(value s)
+typedef struct enc_state_t
 {
-  state_t *state = Theora_state_val(s);
-  theora_clear(&state->ts);
-  theora_info_clear(&state->ti);
+  th_enc_ctx *ts;
+  th_info ti;
+  th_comment tc;
+  ogg_int64_t granulepos;
+  ogg_int64_t packetno;
+} enc_state_t;
+
+#define Theora_enc_state_val(v) (*((enc_state_t**)Data_custom_val(v)))
+
+static void finalize_enc_state(value s)
+{
+  enc_state_t *state = Theora_enc_state_val(s);
+  th_encode_free(state->ts);
+  th_info_clear(&state->ti);
+  th_comment_clear(&state->tc);
   free(state);
 }
 
-static struct custom_operations state_ops =
+static struct custom_operations enc_state_ops =
 {
-  "ocaml_theora_state",
-  finalize_state,
+  "ocaml_enc_theora_state",
+  finalize_enc_state,
   custom_compare_default,
   custom_hash_default,
   custom_serialize_default,
   custom_deserialize_default
 };
 
-/** Encoding API **/
-
-CAMLprim value ocaml_theora_encode_init(value info)
+CAMLprim value ocaml_theora_encode_init(value info, value comments)
 {
-  CAMLparam1(info);
+  CAMLparam2(info, comments);
   CAMLlocal1(ans);
-  int ret;
-  state_t *state = malloc(sizeof(state_t));
-  state->nframes = 0;
-  theora_info_init(&state->ti);
+  enc_state_t *state = malloc(sizeof(enc_state_t));
+  th_info_init(&state->ti);
   info_of_val(info, &state->ti);
-  ret = theora_encode_init(&state->ts, &state->ti);
-  if (ret < 0)
+  th_comment_init(&state->tc);
+  int i;
+  for(i = 0; i < Wosize_val(comments); i++)
+    th_comment_add_tag(&state->tc, String_val(Field(Field(comments, i), 0)), String_val(Field(Field(comments, i), 1)));
+  state->ts = th_encode_alloc(&state->ti);
+  if (state->ts == NULL)
   {
-    theora_info_clear(&state->ti);
+    th_info_clear(&state->ti);
+    th_comment_clear(&state->tc);
     free(state);
-    check_err(ret);
+    check_err(TH_EINVAL);
   }
+  state->granulepos = 0;
+  state->packetno = 0;
 
-  ans = caml_alloc_custom(&state_ops, sizeof(state_t*), 1, 0);
-  Theora_state_val(ans) = state;
+  ans = caml_alloc_custom(&enc_state_ops, sizeof(enc_state_t*), 1, 0);
+  Theora_enc_state_val(ans) = state;
 
   CAMLreturn(ans);
 }
@@ -322,81 +378,74 @@ CAMLprim value ocaml_theora_encode_init(value info)
 CAMLprim value ocaml_theora_encoder_frame_of_granulepos(value t_state, value gpos)
 {
   CAMLparam2(t_state,gpos);
-  state_t *state = Theora_state_val(t_state);
+  enc_state_t *state = Theora_enc_state_val(t_state);
   ogg_int64_t granulepos = (ogg_int64_t)Int64_val(gpos);
-  CAMLreturn(caml_copy_int64((int64)theora_granule_frame(&state->ts,granulepos)));
+  CAMLreturn(caml_copy_int64((int64)th_granule_frame(state->ts,granulepos)));
 }
 
 CAMLprim value ocaml_theora_encoder_time_of_granulepos(value t_state, value gpos)
 {
   CAMLparam2(t_state,gpos);
-  state_t *state = Theora_state_val(t_state);
+  enc_state_t *state = Theora_enc_state_val(t_state);
   ogg_int64_t granulepos = (ogg_int64_t)Int64_val(gpos);
-  CAMLreturn(caml_copy_nativeint((double)theora_granule_time(&state->ts,granulepos)));
+  CAMLreturn(caml_copy_nativeint((double)th_granule_time(state->ts,granulepos)));
 }
 
 CAMLprim value ocaml_theora_encode_header(value t_state, value o_stream_state)
 {
   CAMLparam2(t_state, o_stream_state);
-  state_t *state = Theora_state_val(t_state);
+  enc_state_t *state = Theora_enc_state_val(t_state);
   ogg_stream_state *os = Stream_state_val(o_stream_state);
   ogg_packet op;
+  int ret;
 
-  check_err(theora_encode_header(&state->ts, &op));
-  ogg_stream_packetin(os, &op);
-
-  CAMLreturn(Val_unit);
-}
-
-CAMLprim value ocaml_theora_encode_tables(value t_state, value o_stream_state)
-{
-  CAMLparam2(t_state, o_stream_state);
-  state_t *state = Theora_state_val(t_state);
-  ogg_stream_state *os = Stream_state_val(o_stream_state);
-  ogg_packet op;
-
-  check_err(theora_encode_tables(&state->ts, &op));
-  ogg_stream_packetin(os, &op);
-
-  CAMLreturn(Val_unit);
+  ret = th_encode_flushheader(state->ts, &state->tc, &op);
+  if (ret < 0)
+    check_err(ret);
+  if (ret == 0)
+    CAMLreturn(Val_true);
+  else {
+    state->granulepos = op.granulepos;
+    state->packetno = op.packetno;
+    ogg_stream_packetin(os, &op);
+    CAMLreturn(Val_false);
+  }
 }
 
 CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, value frame)
 {
   CAMLparam3(t_state, o_stream_state, frame);
   CAMLlocal1(v);
-  state_t *state = Theora_state_val(t_state);
+  enc_state_t *state = Theora_enc_state_val(t_state);
   ogg_stream_state *os = Stream_state_val(o_stream_state);
-  yuv_buffer yb;
+  th_ycbcr_buffer yb;
   ogg_packet op;
-  int ret;
-
+  int ret = 1;
   assert(!ogg_stream_eos(os)); /* TODO: raise End_of_stream */
 
   /* Encode the theora packet. */
-  yuv_of_val(frame,&yb);
+  yuv_of_val(frame,yb);
 
   caml_enter_blocking_section();
-  ret = theora_encode_YUVin(&state->ts, &yb);
+  ret = th_encode_ycbcr_in(state->ts, yb);
   caml_leave_blocking_section();
-  state->nframes++;
   if (ret != 0)
     /* TODO:
      * \retval OC_EINVAL Encoder is not ready, or is finished.
      * \retval -1 The size of the given frame differs from those previously input */
     check_err(ret);
 
-  /* TODO: second argument should be 1 if it's the last frame. */
-  ret = theora_encode_packetout(&state->ts, 0, &op);
-  /* TODO:
-   * \retval 0 No internal storage exists OR no packet is ready
-   * \retval -1 The encoding process has completed
-   * \retval 1 Success */
-  if (ret != 1)
+  ret = 1;
+  while (ret > 0) {
+    ret = th_encode_packetout(state->ts, 0, &op);
+    if (ret > 0) {
+      state->granulepos = op.granulepos;
+      state->packetno = op.packetno;
+      ogg_stream_packetin(os, &op);
+    }
+  }
+  if (ret < 0)
     check_err(ret);
-
-  /* Put the packet in the ogg stream. */
-  ogg_stream_packetin(os, &op);
 
   CAMLreturn(Val_unit);
 }
@@ -404,152 +453,172 @@ CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, v
 CAMLprim value ocaml_theora_encode_eos(value t_state, value o_stream_state)
 {
   CAMLparam2(t_state,o_stream_state);
-  state_t *state = Theora_state_val(t_state);
+  enc_state_t *state = Theora_enc_state_val(t_state);
   ogg_stream_state *os = Stream_state_val(o_stream_state);
   ogg_packet op;
-  
-  op.packet = (unsigned char *)NULL;
-  op.bytes = 0;
-  op.b_o_s = 0;
-  op.e_o_s = 1;
-  op.granulepos = state->ts.granulepos+1;
-  /* Header contains 3 packets. */
-  op.packetno = 3+state->nframes+1;
-  ogg_stream_packetin(os, &op);
+  int ret;
+
+  /* Try to grab a packet */
+  ret = th_encode_packetout(state->ts, 1, &op);
+  if (ret <= 0) {
+    check_err(ret);
+    /* No packet was produced: we bake our own ! */
+    op.packet = (unsigned char *)NULL;
+    op.bytes = 0;
+    op.b_o_s = 0;
+    op.e_o_s = 1;
+    op.granulepos = state->granulepos+1;
+    op.packetno = state->packetno+1;
+  }
+  ogg_stream_packetin(os, &op);  
 
   CAMLreturn(Val_unit);   
-
 }
-
-CAMLprim value ocaml_theora_encode_comments(value o_stream_state, value comments)
-{
-  CAMLparam2(o_stream_state, comments);
-  ogg_stream_state *os = Stream_state_val(o_stream_state);
-  ogg_packet op;
-  theora_comment tc;
-  int i;
-
-  theora_comment_init(&tc);
-  for(i = 0; i < Wosize_val(comments); i++)
-    theora_comment_add_tag(&tc, String_val(Field(Field(comments, i), 0)), String_val(Field(Field(comments, i), 1)));
-  theora_encode_comment(&tc, &op);
-  ogg_stream_packetin(os, &op);
-  theora_comment_clear(&tc);
-
-  CAMLreturn(Val_unit);
-}
-
 
 /** Decoding API **/
+
+typedef struct dec_state_t
+{
+  th_dec_ctx *ts;
+  th_info ti;
+  th_comment tc;
+  th_setup_info *tsi;
+  int init;
+  ogg_packet init_packet;
+} dec_state_t;
+
+#define Theora_dec_state_val(v) (*((dec_state_t**)Data_custom_val(v)))
+
+static void finalize_dec_state(value s)
+{
+  dec_state_t *state = Theora_dec_state_val(s);
+  if (state->ts != NULL)
+    th_decode_free(state->ts);
+  th_info_clear(&state->ti);
+  th_comment_clear(&state->tc);
+  if (state->tsi != NULL)
+    th_setup_free(state->tsi);
+  free(state);
+}
+
+static struct custom_operations dec_state_ops =
+{
+  "ocaml_dec_theora_state",
+  finalize_dec_state,
+  custom_compare_default,
+  custom_hash_default,
+  custom_serialize_default,
+  custom_deserialize_default
+};
 
 CAMLprim value caml_theora_check(value packet)
 {
   CAMLparam1(packet);
   ogg_packet *op = Packet_val(packet);
 
-  theora_info ti;
-  theora_comment tc;
-  theora_comment_init(&tc);
-  theora_info_init(&ti);
+  th_info ti;
+  th_comment tc;
+  th_setup_info *tsi = NULL;
+  th_comment_init(&tc);
+  th_info_init(&ti);
   int ret;
 
-  ret = theora_decode_header(&ti, &tc, op);
+  ret = th_decode_headerin(&ti, &tc, &tsi, op);
 
-  theora_comment_clear(&tc);
-  theora_info_clear(&ti);
+  th_comment_clear(&tc);
+  th_info_clear(&ti);
+  if (tsi != NULL)
+    th_setup_free(tsi);
 
-  if (ret == 0) 
+  if (ret > 0) 
     CAMLreturn(Val_true);
   else
     CAMLreturn(Val_false);
 }
 
-CAMLprim value ocaml_theora_create(value packet1, value packet2, value packet3)
+CAMLprim value ocaml_theora_create_dec(value unit)
 {
-  CAMLparam3(packet1,packet2,packet3);
-  CAMLlocal4(ret,t,comment,tmp);
-  state_t *state = malloc(sizeof(state_t));
-  /* Not used for decoding.. */
-  state->nframes = 0;
-  theora_comment tc;
-  ogg_packet *op1 = Packet_val(packet1);
-  ogg_packet *op2 = Packet_val(packet2);
-  ogg_packet *op3 = Packet_val(packet3);
-  theora_comment_init(&tc);
-  theora_info_init(&state->ti);
-
-  if (theora_decode_header(&state->ti, &tc, op1) != 0)
-  {
-    theora_comment_clear(&tc);
-    theora_info_clear(&state->ti);
-    free(state);
-    caml_raise_constant(*caml_named_value("theora_exn_inval"));
-  }
-
-  if (theora_decode_header(&state->ti, &tc, op2) != 0)
-  {
-    theora_comment_clear(&tc);
-    theora_info_clear(&state->ti);
-    free(state);
-    caml_raise_constant(*caml_named_value("theora_exn_inval"));
-  }
-
-  if (theora_decode_header(&state->ti, &tc, op3) != 0)
-  {
-    theora_comment_clear(&tc);
-    theora_info_clear(&state->ti);
-    free(state);
-    caml_raise_constant(*caml_named_value("theora_exn_inval"));
-  }
-
-  comment = caml_alloc_tuple(tc.comments + 1);
-  Store_field(comment,0,caml_copy_string(tc.vendor));
-  if(tc.comments){
-    int i;
-    int len;
-    for(i=0;i<tc.comments;i++){
-      if(tc.user_comments[i]){
-        len=tc.comment_lengths[i];
-        tmp=caml_alloc_string(len);
-        memcpy(String_val(tmp),tc.user_comments[i],len);
-        Store_field(comment,i+1,tmp);
-      }
-    }
-  }
-
-  theora_decode_init(&state->ts, &state->ti);
-
-  t = caml_alloc_custom(&state_ops, sizeof(state_t*), 1, 0);
-  Theora_state_val(t) = state;
-
-  ret = caml_alloc_tuple(3);
-  Store_field (ret, 0, t);
-  Store_field (ret, 1, val_of_info(&state->ti));
-  Store_field (ret, 2, comment);
-
-  theora_comment_clear(&tc);
+  CAMLparam0();
+  CAMLlocal1(ret);
+  dec_state_t *state = malloc(sizeof(dec_state_t));
+  if (state == NULL) 
+    caml_failwith("malloc");
+  th_comment_init(&state->tc);
+  th_info_init(&state->ti);
+  state->ts = NULL;
+  state->tsi = NULL;
+  ret = caml_alloc_custom(&dec_state_ops, sizeof(dec_state_t*), 1, 0);
+  Theora_dec_state_val(ret) = state;
 
   CAMLreturn(ret);
+}
+
+CAMLprim value ocaml_theora_dec_headerin(value decoder, value packet)
+{
+  CAMLparam1(packet);
+  CAMLlocal4(ret,t,comment,tmp);
+  dec_state_t *state = Theora_dec_state_val(decoder);
+  ogg_packet *op = Packet_val(packet);
+  int v;
+
+  v = th_decode_headerin(&state->ti, &state->tc, &state->tsi, op);
+  if (v < 0)
+    caml_raise_constant(*caml_named_value("theora_exn_inval"));
+  
+  if (v == 0) {
+    /* Keep this packet for the first YUV decoding.. */
+    memcpy(&state->init_packet,op,sizeof(ogg_packet));
+    state->init = 1;
+    comment = caml_alloc_tuple(state->tc.comments + 1);
+    Store_field(comment,0,caml_copy_string(state->tc.vendor));
+    if(state->tc.comments){
+      int i;
+      int len;
+      for(i=0;i<state->tc.comments;i++){
+        if(state->tc.user_comments[i]){
+          len=state->tc.comment_lengths[i];
+          tmp=caml_alloc_string(len);
+          memcpy(String_val(tmp),state->tc.user_comments[i],len);
+          Store_field(comment,i+1,tmp);
+        }
+      }
+    }
+    state->ts = th_decode_alloc(&state->ti, state->tsi);
+    ret = caml_alloc_tuple(2);
+    Store_field (ret, 0, val_of_info(&state->ti));
+    Store_field (ret, 1, comment);
+
+    CAMLreturn(ret);
+  } else {
+    caml_raise_constant(*caml_named_value("theora_exn_not_enough_data"));
+  }
 }
 
 CAMLprim value ocaml_theora_decode_YUVout(value decoder, value _os)
 {
   CAMLparam2(decoder,_os);
   ogg_stream_state *os = Stream_state_val(_os);
-  state_t *state = Theora_state_val(decoder);
-  yuv_buffer yb;
+  dec_state_t *state = Theora_dec_state_val(decoder);
+  th_ycbcr_buffer yb;
   ogg_packet op;
 
-  if (ogg_stream_packetout(os,&op) == 0)
-    caml_raise_constant(*caml_named_value("ogg_exn_not_enough_data"));
+  if (state->init != 1) {
+    if (ogg_stream_packetout(os,&op) == 0)
+      caml_raise_constant(*caml_named_value("ogg_exn_not_enough_data"));
 
-  check_err(theora_decode_packetin(&state->ts,&op));
+    /* TODO: use the third argument (granulepos of the decoded packet) */
+    check_err(th_decode_packetin(state->ts,&op,NULL));
+  } else {
+    check_err(th_decode_packetin(state->ts,&state->init_packet,NULL));
+    state->init = 0;
+  }
+    
 
   caml_enter_blocking_section();
-  theora_decode_YUVout(&state->ts,&yb);
+  th_decode_ycbcr_out(state->ts,yb);
   caml_leave_blocking_section();
 
-  CAMLreturn(val_of_yuv(&yb));
+  CAMLreturn(val_of_yuv(yb));
 }
 
 /* Ogg skeleton interface */
@@ -587,7 +656,7 @@ CAMLprim value ocaml_theora_skeleton_fisbone(value serial, value info, value sta
   CAMLparam4(serial,info,start,content);
   CAMLlocal1(packet);
   ogg_packet op;
-  theora_info ti;
+  th_info ti;
   info_of_val(info,&ti); 
   int len = FISBONE_SIZE+caml_string_length(content);
 
@@ -607,7 +676,7 @@ CAMLprim value ocaml_theora_skeleton_fisbone(value serial, value info, value sta
   write64le(op.packet+28, (ogg_int64_t)ti.fps_denominator); /* granulrate denominator */
   write64le(op.packet+36, (ogg_int64_t)Int64_val(start)); /* start granule */
   write32le(op.packet+44, 0); /* preroll, for theora its 0 */
-  *(op.packet+48) = theora_granule_shift (&ti); /* granule shift */
+  *(op.packet+48) = ti.keyframe_granule_shift; /* granule shift */
   memcpy(op.packet+FISBONE_SIZE, String_val(content), caml_string_length(content)); /* message header field */
 
   op.b_o_s = 0;

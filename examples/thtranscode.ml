@@ -1,12 +1,14 @@
 (* Shamelessly inspired of http://theora.org/doc/libtheora-1.0beta1/ *)
 
+exception No_theora
+
 open Theora
 
 let infile = ref "input.ogg"
 let outfile = ref "output.ogg"
 let debug = ref false
 
-let quality = ref 5
+let quality = ref 40
 
 let () =
   Arg.parse
@@ -26,8 +28,14 @@ let in_init () =
   let rec fill os =
     let page = Ogg.Sync.read sync in
     try
-      Ogg.Stream.put_page os page ;
-      if Ogg.Page.eos page then eos := true
+      (* We drop pages which are not for us.. *)
+      if Ogg.Page.serialno page = 
+         Ogg.Stream.serialno os
+      then
+       begin
+        Ogg.Stream.put_page os page ;
+        if Ogg.Page.eos page then eos := true
+       end
     with
        | Ogg.Bad_data -> fill os (* Do not care about page that are not for us.. *)
   in
@@ -36,7 +44,7 @@ let in_init () =
     (** Get First page *)
     let page = Ogg.Sync.read sync in
     (** Check wether this is a b_o_s *)
-    if not (Ogg.Page.bos page) then raise Not_found ;
+    if not (Ogg.Page.bos page) then raise No_theora ;
     (** Create a stream with this ID *)
     let serial = Ogg.Page.serialno page in
     Printf.printf "Testing stream %nx\n" serial ;
@@ -47,34 +55,47 @@ let in_init () =
     if not (Decoder.check packet) then 
       raise Not_found;
     Printf.printf "Got a theora stream !\n" ;
+    let dec = Decoder.create () in
     (** Decode headers *)
-    fill os;
-    let packet2 = Ogg.Stream.get_packet os in
-    fill os;
-    let packet3 = Ogg.Stream.get_packet os in
-    serial,os,Decoder.create packet packet2 packet3
+    let rec f packet = 
+      try
+        Decoder.headerin dec packet
+      with
+        | Not_enough_data -> 
+          let rec g () = 
+             try
+               let packet = Ogg.Stream.get_packet os in
+               f packet
+             with
+               | Ogg.Not_enough_data -> fill os; g ()
+          in
+          g ()
+    in
+    let info,vendor,comments = f packet in
+    serial,os,dec,info,vendor,comments
   in
   (** Now find a theora stream *)
   let rec init () = 
     try 
       test_theora ()
     with
-    (** Not_found is not catched: ogg stream always start
-        with all b_o_s and we don't care about sequenced streams here *)
-      | Ogg.Bad_data -> 
-         ( Printf.printf "This stream was not theora..\n"; flush_all ();
+      | Not_found -> 
+         ( Printf.printf "This stream was not theora..\n";
            init () )
+      | No_theora ->
+         ( Printf.printf "No theora stream was found..\n%!";
+           raise No_theora )
   in
-  let serial,os,(t,info,vendor,comments) = init () in
+  let serial,os,t,info,vendor,comments = init () in
   Printf.printf 
      "Ogg logical stream %nx is Theora %dx%d %.02f fps video\n"
-     serial info.width info.height
+     serial info.frame_width info.frame_height
      ((float_of_int info.fps_numerator) /. (float_of_int info.fps_denominator)) ;
   Printf.printf "Encoded frame content is %dx%d with %dx%d offset\n"
-     info.frame_width info.frame_height info.offset_x 
-     info.offset_y ;
+     info.picture_width info.picture_height info.picture_x 
+     info.picture_y ;
   Printf.printf "YUV4MPEG2 W%d H%d F%d:%d I%c A%d:%d\n" 
-     info.width info.height info.fps_numerator
+     info.frame_width info.frame_height info.fps_numerator
      info.fps_denominator 'p' 
      info.aspect_numerator info.aspect_denominator ;
   Printf.printf "Vendor: %s\n" vendor ;
@@ -86,12 +107,9 @@ let out_init info =
   let oc = open_out !outfile in
   let out s = output_string oc s; flush oc in
   let os = Ogg.Stream.create () in
-  let t = Encoder.create info in
+  let comments = ["artitst", "test artist"; "title", "test title"] in
+  let t = Encoder.create info comments in
     Encoder.encode_header t os;
-    out (Ogg.Stream.pageout os);
-    let comment = ["artitst", "test artist"; "title", "test title"] in
-    Encoder.encode_comments os comment;
-    Encoder.encode_tables t os;
     out (Ogg.Stream.flush os);
     t,os,out
 
@@ -99,46 +117,36 @@ let () =
   let dec,is,fill,info,fd = in_init () in
   let info = 
   {
-    width = info.width;
-    height = info.height;
-    frame_width = info.frame_width;
-    frame_height = info.frame_height;
-    offset_x = info.offset_x;
-    offset_y = info.offset_y;
-    fps_numerator = info.fps_numerator;
-    fps_denominator = info.fps_denominator;
-    aspect_numerator = info.aspect_numerator;
-    aspect_denominator = info.aspect_denominator;
-    colorspace = info.colorspace;
-    target_bitrate = info.target_bitrate;
-    quality = !quality;
-    quick_p = true;
-    version_major = 0;
-    version_minor = 0;
-    version_subminor = 0;
-    dropframes_p = false;
-    keyframe_auto_p = true;
-    keyframe_frequency = 64;
-    keyframe_frequency_force = 64;
-    keyframe_data_target_bitrate = (info.target_bitrate * 3 / 2);
-    keyframe_auto_threshold = 80;
-    keyframe_mindistance = 8;
-    noise_sensitivity = 1;
-    sharpness = 1; (* ??? *)
-    pixelformat = PF_420
+    info with
+      target_bitrate = 0;
+      quality = !quality;
   }
   in
   let enc,os,out = out_init info in
+  let latest_yuv = ref None in
   let rec generator () =
     try
-      Decoder.get_yuv dec is 
+      let yuv = Decoder.get_yuv dec is in
+      latest_yuv := Some yuv ;
+      yuv
     with 
       | Ogg.Not_enough_data -> (fill is; generator ()) 
+      | Duplicate_frame -> 
+         (* Got a duplicate frame, sending previous one ! *)
+         begin
+          match !latest_yuv with
+            | Some x -> x
+            | None   -> raise Internal_error
+         end
   in
+  Printf.printf "Starting transcoding loop !\n%!";
   while not !eos do
     let op = Encoder.encode_page enc os generator in
     let s_o_p (h,b) = h ^ b in
     let op = s_o_p op in
       out op
   done;
-  Unix.close fd
+  Encoder.eos enc os;
+  out (Ogg.Stream.flush os);
+  Unix.close fd;
+  Gc.full_major ()
