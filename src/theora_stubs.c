@@ -457,6 +457,11 @@ CAMLprim value ocaml_theora_encode_eos(value t_state, value o_stream_state)
   ogg_stream_state *os = Stream_state_val(o_stream_state);
   ogg_packet op;
   int ret;
+  ogg_int64_t iframe;
+  ogg_int64_t pframe;
+
+  /* TODO: a proper eos should be acheived using an empty ogg page with the 
+   * eos marker.. */
 
   /* Try to grab a packet */
   ret = th_encode_packetout(state->ts, 1, &op);
@@ -467,7 +472,11 @@ CAMLprim value ocaml_theora_encode_eos(value t_state, value o_stream_state)
     op.bytes = 0;
     op.b_o_s = 0;
     op.e_o_s = 1;
-    op.granulepos = state->granulepos+1;
+    /* Set the granulepos as a new keyframe */
+    iframe = state->granulepos >> state->ti.keyframe_granule_shift;
+    pframe = state->granulepos - (iframe << state->ti.keyframe_granule_shift);
+    iframe = iframe + pframe + 1;
+    op.granulepos = iframe << state->ti.keyframe_granule_shift;
     op.packetno = state->packetno+1;
   }
   ogg_stream_packetin(os, &op);  
