@@ -21,8 +21,6 @@ let () =
     ignore
     "thranscode [options]"
 
-let eos = ref false
-
 let in_init () =
   let sync,fd = Ogg.Sync.create_from_file !infile in
   let rec fill os =
@@ -32,10 +30,7 @@ let in_init () =
       if Ogg.Page.serialno page = 
          Ogg.Stream.serialno os
       then
-       begin
         Ogg.Stream.put_page os page ;
-        if Ogg.Page.eos page then eos := true
-       end
     with
        | Ogg.Bad_data -> fill os (* Do not care about page that are not for us.. *)
   in
@@ -130,7 +125,8 @@ let () =
       latest_yuv := Some yuv ;
       yuv
     with 
-      | Ogg.Not_enough_data -> (fill is; generator ()) 
+      | Ogg.Not_enough_data when not (Ogg.Stream.eos is) -> 
+         (fill is; generator ()) 
       | Duplicate_frame -> 
          (* Got a duplicate frame, sending previous one ! *)
          begin
@@ -140,12 +136,17 @@ let () =
          end
   in
   Printf.printf "Starting transcoding loop !\n%!";
-  while not !eos do
-    let op = Encoder.encode_page enc os generator in
-    let s_o_p (h,b) = h ^ b in
-    let op = s_o_p op in
-      out op
-  done;
+  begin
+   try
+    while true do
+      let op = Encoder.encode_page enc os generator in
+      let s_o_p (h,b) = h ^ b in
+      let op = s_o_p op in
+        out op
+    done
+   with
+     | Ogg.Not_enough_data -> ()
+  end ;
   Encoder.eos enc os;
   out (Ogg.Stream.flush os);
   Unix.close fd;
