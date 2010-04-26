@@ -1,4 +1,4 @@
-# OCaml-Lastfm examples.
+# OCaml-theora examples.
 #
 # Copyright 2007 by the Savonet team.
 #
