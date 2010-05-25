@@ -273,7 +273,7 @@ static value val_of_yuv(th_ycbcr_buffer buffer)
   len = buffer[0].stride*buffer[0].height;
   data = malloc(len);
   if (data == NULL)
-    caml_failwith("malloc");
+    caml_raise_out_of_memory();
   y = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
   memcpy(data,buffer[0].data,len);
   Store_field (ret, i++, y);
@@ -285,7 +285,7 @@ static value val_of_yuv(th_ycbcr_buffer buffer)
   len = buffer[1].stride*buffer[1].height;
   data = malloc(len);
   if (data == NULL)
-    caml_failwith("malloc");
+    caml_raise_out_of_memory();
   u = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
   memcpy(data,buffer[1].data,len);
   Store_field (ret, i++, u);
@@ -297,7 +297,7 @@ static value val_of_yuv(th_ycbcr_buffer buffer)
   len = buffer[2].stride*buffer[2].height;
   data = malloc(len);
   if (data == NULL)
-    caml_failwith("malloc");
+    caml_raise_out_of_memory();
   v = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
   memcpy(data,buffer[2].data,len);
   Store_field (ret, i++, v);
@@ -551,7 +551,7 @@ CAMLprim value ocaml_theora_create_dec(value unit)
   CAMLlocal1(ret);
   dec_state_t *state = malloc(sizeof(dec_state_t));
   if (state == NULL) 
-    caml_failwith("malloc");
+    caml_raise_out_of_memory();
   th_comment_init(&state->tc);
   th_info_init(&state->ti);
   state->ts = NULL;
@@ -672,7 +672,7 @@ CAMLprim value ocaml_theora_skeleton_fisbone(value serial, value info, value sta
   memset (&op, 0, sizeof (op));
   op.packet = malloc(len);
   if (op.packet == NULL)
-    caml_failwith("malloc");
+    caml_raise_out_of_memory();
 
   memset (op.packet, 0, len);
   /* it will be the fisbone packet for the theora video */
