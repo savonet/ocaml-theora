@@ -27,7 +27,7 @@ let in_init () =
     let page = Ogg.Sync.read sync in
     try
       (* We drop pages which are not for us.. *)
-      if Ogg.Page.serialno page = 
+      if Ogg.Page.serialno page =
          Ogg.Stream.serialno os
       then
         Ogg.Stream.put_page os page ;
@@ -35,7 +35,7 @@ let in_init () =
        | Ogg.Bad_data -> fill os (* Do not care about page that are not for us.. *)
   in
   (** Test wether the stream is theora *)
-  let test_theora () = 
+  let test_theora () =
     (** Get First page *)
     let page = Ogg.Sync.read sync in
     (** Check wether this is a b_o_s *)
@@ -47,17 +47,17 @@ let in_init () =
     Ogg.Stream.put_page os page ;
     let packet = Ogg.Stream.get_packet os in
     (** Test header. Do not catch anything, first page should be sufficient *)
-    if not (Decoder.check packet) then 
+    if not (Decoder.check packet) then
       raise Not_found;
     Printf.printf "Got a theora stream !\n" ;
     let dec = Decoder.create () in
     (** Decode headers *)
-    let rec f packet = 
+    let rec f packet =
       try
         Decoder.headerin dec packet
       with
-        | Not_enough_data -> 
-          let rec g () = 
+        | Not_enough_data ->
+          let rec g () =
              try
                let packet = Ogg.Stream.get_packet os in
                f packet
@@ -70,11 +70,11 @@ let in_init () =
     serial,os,dec,info,vendor,comments
   in
   (** Now find a theora stream *)
-  let rec init () = 
-    try 
+  let rec init () =
+    try
       test_theora ()
     with
-      | Not_found -> 
+      | Not_found ->
          ( Printf.printf "This stream was not theora..\n";
            init () )
       | No_theora ->
@@ -82,16 +82,16 @@ let in_init () =
            raise No_theora )
   in
   let serial,os,t,info,vendor,comments = init () in
-  Printf.printf 
+  Printf.printf
      "Ogg logical stream %nx is Theora %dx%d %.02f fps video\n"
      serial info.frame_width info.frame_height
      ((float_of_int info.fps_numerator) /. (float_of_int info.fps_denominator)) ;
   Printf.printf "Encoded frame content is %dx%d with %dx%d offset\n"
-     info.picture_width info.picture_height info.picture_x 
+     info.picture_width info.picture_height info.picture_x
      info.picture_y ;
-  Printf.printf "YUV4MPEG2 W%d H%d F%d:%d I%c A%d:%d\n" 
+  Printf.printf "YUV4MPEG2 W%d H%d F%d:%d I%c A%d:%d\n"
      info.frame_width info.frame_height info.fps_numerator
-     info.fps_denominator 'p' 
+     info.fps_denominator 'p'
      info.aspect_numerator info.aspect_denominator ;
   Printf.printf "Vendor: %s\n" vendor ;
   List.iter (fun (x,y) -> Printf.printf "%s: %s\n" x y) comments ;
@@ -108,9 +108,9 @@ let out_init info =
     out (Ogg.Stream.flush os);
     t,os,out
 
-let () = 
+let () =
   let dec,is,fill,info,fd = in_init () in
-  let info = 
+  let info =
   {
     info with
       target_bitrate = 0;
@@ -124,10 +124,10 @@ let () =
       let yuv = Decoder.get_yuv dec is in
       latest_yuv := Some yuv ;
       yuv
-    with 
-      | Ogg.Not_enough_data when not (Ogg.Stream.eos is) -> 
-         (fill is; generator ()) 
-      | Duplicate_frame -> 
+    with
+      | Ogg.Not_enough_data when not (Ogg.Stream.eos is) ->
+         (fill is; generator ())
+      | Duplicate_frame ->
          (* Got a duplicate frame, sending previous one ! *)
          begin
           match !latest_yuv with
