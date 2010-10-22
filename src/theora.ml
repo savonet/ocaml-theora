@@ -114,11 +114,20 @@ module Encoder =
 struct
   type t
 
-  external create : info -> (string*string) array -> t = "ocaml_theora_encode_init"
+  type settings =
+    {
+      keyframe_frequency : int option ;
+      vp3_compatible     : bool option ;
+      soft_target        : bool option ;
+      buffer_delay       : int option ;
+      speed              : int option ;
+    }
 
-  let create info comments = 
+  external create : info -> settings -> (string*string) array -> t = "ocaml_theora_encode_init"
+
+  let create info params comments = 
     let comments = ("ENCODER", encoder_tag)::comments in
-    create info (Array.of_list comments)
+    create info params (Array.of_list comments)
 
   external encode_header : t -> Ogg.Stream.t -> bool = "ocaml_theora_encode_header"
 

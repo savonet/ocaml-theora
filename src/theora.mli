@@ -140,8 +140,17 @@ module Encoder :
 sig
   type t
 
+  type settings =
+    {
+      keyframe_frequency : int option ;
+      vp3_compatible     : bool option ;
+      soft_target        : bool option ;
+      buffer_delay       : int option ;
+      speed              : int option ;
+    }
+
   (** Initialize a [state] handle for decoding. *)
-  val create : info -> (string*string) list -> t
+  val create : info -> settings -> (string*string) list -> t
 
   (**
     * Fills the given stream with the header packets.

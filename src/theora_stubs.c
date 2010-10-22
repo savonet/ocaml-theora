@@ -347,10 +347,15 @@ static struct custom_operations enc_state_ops =
   custom_deserialize_default
 };
 
-CAMLprim value ocaml_theora_encode_init(value info, value comments)
+/* Thanks you
+ * http://www.linux-nantes.org/~fmonnier/ocaml/ocaml-wrapping-c.php#ref_option */
+#define Val_none Val_int(0)
+#define Some_val(v) Field(v,0)
+
+CAMLprim value ocaml_theora_encode_init(value info, value params, value comments)
 {
-  CAMLparam2(info, comments);
-  CAMLlocal1(ans);
+  CAMLparam3(info, params, comments);
+  CAMLlocal2(ans,c);
   enc_state_t *state = malloc(sizeof(enc_state_t));
   th_info_init(&state->ti);
   info_of_val(info, &state->ti);
@@ -368,6 +373,45 @@ CAMLprim value ocaml_theora_encode_init(value info, value comments)
   }
   state->granulepos = 0;
   state->packetno = 0;
+
+  /* Apply settings */
+  int j = 0;
+  int v; 
+  c = Field(params,j++);
+  if (c != Val_none)
+  { 
+    v = Int_val(Some_val(c));
+    check_err(th_encode_ctl(state->ts,TH_ENCCTL_SET_KEYFRAME_FREQUENCY_FORCE,&v,sizeof(int)));
+  }
+  c = Field(params,j++);
+  if (c != Val_none)
+  {
+    v = 0;
+    if (Some_val(c) == Val_true)
+      v = 1;
+    check_err(th_encode_ctl(state->ts,TH_ENCCTL_SET_VP3_COMPATIBLE,&v,sizeof(int)));
+  }
+  c = Field(params,j++);
+  if (c != Val_none)
+  {
+    if (Some_val(c) == Val_true)
+    {
+      v = TH_RATECTL_CAP_UNDERFLOW;
+      check_err(th_encode_ctl(state->ts,TH_ENCCTL_SET_RATE_FLAGS,&v,sizeof(int)));
+    }
+  }
+  c = Field(params,j++);
+  if (c != Val_none)
+  {
+    v = Int_val(Some_val(c));
+    check_err(th_encode_ctl(state->ts,TH_ENCCTL_SET_RATE_BUFFER,&v,sizeof(int)));
+  }
+  c = Field(params,j++);
+  if (c != Val_none)
+  {
+    v = Int_val(Some_val(c)); 
+    check_err(th_encode_ctl(state->ts,TH_ENCCTL_SET_SPLEVEL,&v,sizeof(int)));
+  }
 
   ans = caml_alloc_custom(&enc_state_ops, sizeof(enc_state_t*), 1, 0);
   Theora_enc_state_val(ans) = state;
@@ -472,11 +516,10 @@ CAMLprim value ocaml_theora_encode_eos(value t_state, value o_stream_state)
     op.bytes = 0;
     op.b_o_s = 0;
     op.e_o_s = 1;
-    /* Set the granulepos as a new keyframe */
+    /* Set the granulepos as a new frame */
     iframe = state->granulepos >> state->ti.keyframe_granule_shift;
-    pframe = state->granulepos - (iframe << state->ti.keyframe_granule_shift);
-    iframe = iframe + pframe + 1;
-    op.granulepos = iframe << state->ti.keyframe_granule_shift;
+    pframe = state->granulepos & ~iframe;
+    op.granulepos = (iframe << state->ti.keyframe_granule_shift) | (pframe + 1) ;
     op.packetno = state->packetno+1;
   }
   ogg_stream_packetin(os, &op);  
