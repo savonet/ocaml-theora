@@ -3,7 +3,7 @@
 PROGNAME := ocaml-theora
 # TODO: add back examples when working again..
 DISTFILES := CHANGES COPYING Makefile.in README \
-	bootstrap configure configure.ac \
+	bootstrap configure configure.ac m4/*.m4 \
 	src/*.ml src/*.mli src/*.c src/Makefile.in src/META.in \
 	src/OCamlMakefile examples/OCamlMakefile examples/*.ml \
 	examples/Makefile*
