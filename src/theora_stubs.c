@@ -653,10 +653,14 @@ CAMLprim value ocaml_theora_decode_YUVout(value decoder, value _os)
   dec_state_t *state = Theora_dec_state_val(decoder);
   th_ycbcr_buffer yb;
   ogg_packet op;
+  int ret;
 
   if (state->init != 1) {
-    if (ogg_stream_packetout(os,&op) == 0)
+    ret = ogg_stream_packetout(os,&op);
+    if (ret == 0)
       caml_raise_constant(*caml_named_value("ogg_exn_not_enough_data"));
+    if (ret == -1)
+      caml_raise_constant(*caml_named_value("ogg_exn_out_of_sync"));
 
     /* TODO: use the third argument (granulepos of the decoded packet) */
     check_err(th_decode_packetin(state->ts,&op,NULL));
