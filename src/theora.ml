@@ -1,5 +1,5 @@
 (*
- * Copyright 2007-2009 Samuel Mimram, Romain Beauxis
+ * Copyright 2007-2011 Savonet team
  *
  * This file is part of ocaml-theora.
  *
@@ -29,7 +29,6 @@ exception Internal_error
 exception Invalid_data
 exception Unknown_error of int
 exception Duplicate_frame
-exception Not_enough_data
 exception Done
 exception Not_initialized
 
@@ -38,7 +37,7 @@ let () =
   Callback.register_exception "theora_exn_inval" Invalid_data;
   Callback.register_exception "theora_exn_unknown" (Unknown_error 0) ;
   Callback.register_exception "theora_exn_dup_frame" Duplicate_frame ;
-  Callback.register_exception "theora_exn_not_enough_data" Not_enough_data
+  Callback.register_exception "theora_exn_not_enough_data" Ogg.Not_enough_data
 
 external version_string : unit -> string = "ocaml_theora_version_string"
 
@@ -110,6 +109,14 @@ type yuv_buffer =
 
 let encoder_tag = "ocaml-theora by the savonet team (http://savonet.sf.net/)"
 
+external is_keyframe : Ogg.Stream.packet -> int = "ocaml_theora_ogg_packet_iskeyframe"
+
+let is_keyframe op = 
+  match is_keyframe op with
+    | 1 -> true
+    | 0 -> false
+    | _ -> raise Invalid_data
+
 module Encoder =
 struct
   type t
@@ -151,8 +158,6 @@ struct
     in
     f ()
 
-  external time_of_granulepos : t -> Int64.t -> Nativeint.t = "ocaml_theora_encoder_time_of_granulepos"
-
   external frames_of_granulepos : t -> Int64.t -> Int64.t = "ocaml_theora_encoder_frame_of_granulepos"
 
   external eos : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_eos"
@@ -161,53 +166,33 @@ end
 module Decoder =
 struct
   type decoder
-  type t = 
-    { 
-      dec : decoder ;
-      mutable init : bool
-    }
+  type t 
 
   external check : Ogg.Stream.packet -> bool = "caml_theora_check"
 
   external create : unit -> decoder = "ocaml_theora_create_dec"
 
-  let create () = 
-    {
-      dec = create ();
-      init = false
-    }
-
-  let is_ready dec = dec.init
-
   external headerin : decoder -> Ogg.Stream.packet -> info*(string array) = "ocaml_theora_dec_headerin"
 
   let headerin dec p = 
-    if dec.init then
-      raise Done
-    else
-      let info,comments = headerin dec.dec p in
-      let vendor,comments =
-        match Array.to_list comments with
-          | e :: l -> e,l
-          | [] -> "",[]
-      in
-      let split s =
-        try
-          let pos = String.index s '=' in
-          String.sub s 0 pos,String.sub s (pos+1) ((String.length s) - pos - 1)
-        with
-          | Not_found -> "",s
-      in
-      dec.init <- true ;
-      info,vendor,(List.map split comments)
+    let info,comments = headerin dec p in
+    let vendor,comments =
+      match Array.to_list comments with
+        | e :: l -> e,l
+        | [] -> "",[]
+    in
+    let split s =
+      try
+        let pos = String.index s '=' in
+        String.sub s 0 pos,String.sub s (pos+1) ((String.length s) - pos - 1)
+      with
+        | Not_found -> "",s
+    in
+    (Obj.magic dec),info,vendor,(List.map split comments)
 
-  external get_yuv : decoder -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
+  external frames_of_granulepos : t -> Int64.t -> Int64.t = "ocaml_theora_decoder_frame_of_granulepos"
 
-  let get_yuv dec os = 
-    if not dec.init then
-      raise Not_initialized
-    else
-      get_yuv dec.dec os
+  external get_yuv : t -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
 end
 
 module Skeleton = 

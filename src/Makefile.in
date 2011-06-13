@@ -25,7 +25,7 @@ DVIPS = @DVIPS@
 PS2PDF = @PS2PDF@
 OCAMLLIBPATH = @CAMLLIBPATH@
 
-SOURCES = theora_stubs.c theora.mli theora.ml
+SOURCES = theora_stubs.c theora.mli theora.ml ogg_demuxer_theora_decoder.mli ogg_demuxer_theora_decoder.ml
 RESULT = theora
 OCAMLDOCFLAGS = -stars
 LIBINSTALL_FILES = $(wildcard *.mli *.cmi *.cma *.cmxa *.cmx *.a *.so)

@@ -315,6 +315,14 @@ CAMLprim value ocaml_theora_default_granuleshift(value unit)
   CAMLreturn(Int_val(ret)); 
 }
 
+CAMLprim value ocaml_theora_ogg_packet_iskeyframe(value _op)
+{
+  CAMLparam1(_op);
+  ogg_packet *op = Packet_val(_op);
+
+  CAMLreturn(Val_int(th_packet_iskeyframe(op)));
+}
+
 /** Encoding API **/
 
 typedef struct enc_state_t
@@ -423,16 +431,7 @@ CAMLprim value ocaml_theora_encoder_frame_of_granulepos(value t_state, value gpo
 {
   CAMLparam2(t_state,gpos);
   enc_state_t *state = Theora_enc_state_val(t_state);
-  ogg_int64_t granulepos = (ogg_int64_t)Int64_val(gpos);
-  CAMLreturn(caml_copy_int64((int64)th_granule_frame(state->ts,granulepos)));
-}
-
-CAMLprim value ocaml_theora_encoder_time_of_granulepos(value t_state, value gpos)
-{
-  CAMLparam2(t_state,gpos);
-  enc_state_t *state = Theora_enc_state_val(t_state);
-  ogg_int64_t granulepos = (ogg_int64_t)Int64_val(gpos);
-  CAMLreturn(caml_copy_nativeint((double)th_granule_time(state->ts,granulepos)));
+  CAMLreturn(caml_copy_int64(th_granule_frame(state->ts,Int64_val(gpos))));
 }
 
 CAMLprim value ocaml_theora_encode_header(value t_state, value o_stream_state)
@@ -675,6 +674,13 @@ CAMLprim value ocaml_theora_decode_YUVout(value decoder, value _os)
   caml_leave_blocking_section();
 
   CAMLreturn(val_of_yuv(yb));
+}
+
+CAMLprim value ocaml_theora_decoder_frame_of_granulepos(value t_state, value gpos)
+{
+  CAMLparam2(t_state,gpos);
+  dec_state_t *state = Theora_dec_state_val(t_state);
+  CAMLreturn(caml_copy_int64(th_granule_frame(state->ts,Int64_val(gpos))));
 }
 
 /* Ogg skeleton interface */

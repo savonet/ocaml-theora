@@ -40,7 +40,6 @@ exception Unknown_error of int
 exception Duplicate_frame
 
 (** Exceptions used by the decoding module. *)
-exception Not_enough_data
 exception Done
 exception Not_initialized
 
@@ -53,6 +52,12 @@ val version_string : string
 
 (** major, minor and sub version numbers of the encoder. *)
 val version_number : int * int * int
+
+(** Determines whether a theora packet is a key frame or not.
+  *
+  * raises [Invalid_data] if The packet is not a video data 
+  * packet. *)
+val is_keyframe : Ogg.Stream.packet -> bool
 
 (** {2 Types and datastructures} *)
 
@@ -165,11 +170,6 @@ sig
   (** Encode a buffer. *)
   val encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit
 
-  (** Convert a granulepos to absolute time in seconds. The granulepos is
-    * interpreted in the context of a given theora_state handle, and gives
-    * the end time of a frame's presentation as used in Ogg mux ordering. *)
-  val time_of_granulepos : t -> Int64.t -> Nativeint.t
-
   (** Convert a granulepos to an absolute frame index, starting at 0.
     * The granulepos is interpreted in the context of a given theora_state handle. *)
   val frames_of_granulepos : t -> Int64.t -> Int64.t
@@ -180,6 +180,9 @@ end
 
 module Decoder :
 sig
+  (** Type for an uninitialized decoder. *)
+  type decoder
+  (** Type for an initialized decoder. *)
   type t
 
   (**
@@ -193,22 +196,18 @@ sig
 
   (** Initialize the decoding structure. 
     * The decoder should then be processed with [headerin]. *)
-  val create : unit -> t
-
-  (** Returns [true] is the given decoder was properly
-    * initialized using [headerin] *)
-  val is_ready : t -> bool
+  val create : unit -> decoder
 
   (** Add one packet from the stream and try to parse theora headers.
     *
-    * Raises [Not_enought_data] is decoding header needs another packet.
+    * Returns an initialized decoder.
     *
-    * Raises [Done] if the decoder was already initialized. 
+    * Raises [Ogg.Not_enought_data] is decoding header needs another packet.
     *
     * This function should be called with the first packets of the stream
     * until it returns the requested values. It may consume at most 5 packets
     * (3 header packet, 1 additional packet and the initial video packet) *)
-  val headerin : t -> Ogg.Stream.packet -> info*string*((string*string) list)
+  val headerin : decoder -> Ogg.Stream.packet -> t*info*string*((string*string) list)
 
  (**
    * Output the next available frame of decoded YUV data. 
@@ -221,6 +220,10 @@ sig
    * Raises [Not_initialized] if the decoder was not properly
    * initialized with [headerin]. *)
   val get_yuv : t -> Ogg.Stream.t -> yuv_buffer
+
+  (** Convert a granulepos to an absolute frame index, starting at 0.
+    * The granulepos is interpreted in the context of a given theora_state handle. *)
+  val frames_of_granulepos : t -> Int64.t -> Int64.t
 end
 
 module Skeleton : 
