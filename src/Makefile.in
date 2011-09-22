@@ -30,12 +30,12 @@ RESULT = theora
 OCAMLDOCFLAGS = -stars
 LIBINSTALL_FILES = $(wildcard *.mli *.cmi *.cma *.cmxa *.cmx *.a *.so)
 INCDIRS = @OCAMLOGG_INC@
-ACLIBS = @LIBS@ @libtheora_LIBS@
+ACLIBS = @LIBS@
 CLIBS = $(ACLIBS:-l%=%)
-LDFLAGS = @LDFLAGS@ @libtheora_LDFLAGS@
+LDFLAGS = @LDFLAGS@
 LIBDIRS = $(LDFLAGS:-L%=%)
 CC = @CC@
-CFLAGS = @CFLAGS@ @libtheora_CFLAGS@ -Wall -DCAML_NAME_SPACE
+CFLAGS = @CFLAGS@ -Wall -DCAML_NAME_SPACE
 CPPFLAGS = @CPPFLAGS@
 NO_CUSTOM = yes
 OCAMLFLAGS = @OCAMLFLAGS@

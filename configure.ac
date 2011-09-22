@@ -19,23 +19,8 @@ AC_PROG_CC()
 AC_CHECK_TOOL([AR],[ar],no)
 AC_SUBST(AR)
 PKG_PROG_PKG_CONFIG()
-
-# PKG_CHECK_MODULES loses when you need --libs-only-[lL]
-if ! $PKG_CONFIG --exists theoradec; then
-        AC_MSG_ERROR([libtheoradec not found])
-fi
-if ! $PKG_CONFIG --exists theoraenc; then
-        AC_MSG_ERROR([libtheoraenc not found])
-fi
-libtheora_CFLAGS=`$PKG_CONFIG --cflags theoradec` 
-libtheora_CFLAGS="$libtheora_CFLAGS`$PKG_CONFIG --cflags theoraenc`"
-AC_SUBST([libtheora_CFLAGS])
-libtheora_LIBS=`$PKG_CONFIG --libs-only-l theoradec`
-libtheora_LIBS="$libtheora_LIBS `$PKG_CONFIG --libs-only-l theoraenc`"
-AC_SUBST([libtheora_LIBS])
-libtheora_LDFLAGS=`$PKG_CONFIG --libs-only-L theoradec` 
-libtheora_LDFLAGS="$libtheora_LDFLAGS `$PKG_CONFIG --libs-only-L theoraenc`"
-AC_SUBST([libtheora_LDFLAGS])
+PKG_CONFIG_CHECK_MODULE([theoradec])
+PKG_CONFIG_CHECK_MODULE([theoraenc])
 
 AC_ARG_WITH([ogg-dir],AC_HELP_STRING([--with-ogg-dir=path],
         [use "path" as the location of ocaml-ogg (autodetected by default)]))
