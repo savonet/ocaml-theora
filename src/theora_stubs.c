@@ -271,10 +271,8 @@ static value val_of_yuv(th_ycbcr_buffer buffer)
   Store_field (ret, i++, Val_int(buffer[0].height));
   Store_field (ret, i++, Val_int(buffer[0].stride));
   len = buffer[0].stride*buffer[0].height;
-  data = malloc(len);
-  if (data == NULL)
-    caml_raise_out_of_memory();
-  y = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
+  y = caml_ba_alloc(CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, NULL, &len);
+  data = Caml_ba_data_val(y);
   memcpy(data,buffer[0].data,len);
   Store_field (ret, i++, y);
 
@@ -283,10 +281,8 @@ static value val_of_yuv(th_ycbcr_buffer buffer)
   Store_field (ret, i++, Val_int(buffer[1].height));
   Store_field (ret, i++, Val_int(buffer[1].stride));
   len = buffer[1].stride*buffer[1].height;
-  data = malloc(len);
-  if (data == NULL)
-    caml_raise_out_of_memory();
-  u = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
+  u = caml_ba_alloc(CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, NULL, &len);
+  data = Caml_ba_data_val(u);
   memcpy(data,buffer[1].data,len);
   Store_field (ret, i++, u);
 
@@ -295,10 +291,8 @@ static value val_of_yuv(th_ycbcr_buffer buffer)
   Store_field (ret, i++, Val_int(buffer[2].height));
   Store_field (ret, i++, Val_int(buffer[2].stride));
   len = buffer[2].stride*buffer[2].height;
-  data = malloc(len);
-  if (data == NULL)
-    caml_raise_out_of_memory();
-  v = caml_ba_alloc(CAML_BA_MANAGED | CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, data, &len);
+  v = caml_ba_alloc(CAML_BA_C_LAYOUT | CAML_BA_UINT8, 1, NULL, &len);
+  data = Caml_ba_data_val(v);
   memcpy(data,buffer[2].data,len);
   Store_field (ret, i++, v);
 
