@@ -598,6 +598,7 @@ CAMLprim value ocaml_theora_create_dec(value unit)
   th_info_init(&state->ti);
   state->ts = NULL;
   state->tsi = NULL;
+  state->init_packet.packet = NULL;
   ret = caml_alloc_custom(&dec_state_ops, sizeof(dec_state_t*), 1, 0);
   Theora_dec_state_val(ret) = state;
 
@@ -667,7 +668,6 @@ CAMLprim value ocaml_theora_decode_YUVout(value decoder, value _os)
     check_err(th_decode_packetin(state->ts,&state->init_packet,NULL));
     state->init = 0;
   }
-    
 
   caml_enter_blocking_section();
   th_decode_ycbcr_out(state->ts,yb);
