@@ -136,7 +136,7 @@ struct
     let comments = ("ENCODER", encoder_tag)::comments in
     create info params (Array.of_list comments)
 
-  external encode_header : t -> Ogg.Stream.t -> bool = "ocaml_theora_encode_header"
+  external encode_header : t -> Ogg.Stream.stream -> bool = "ocaml_theora_encode_header"
 
   let encode_header enc os = 
     let rec f () = 
@@ -145,7 +145,7 @@ struct
     in
     f ()
 
-  external encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit = "ocaml_theora_encode_buffer"
+  external encode_buffer : t -> Ogg.Stream.stream -> yuv_buffer -> unit = "ocaml_theora_encode_buffer"
 
   let encode_page enc os generator = 
     let rec f () =
@@ -160,7 +160,7 @@ struct
 
   external frames_of_granulepos : t -> Int64.t -> Int64.t = "ocaml_theora_encoder_frame_of_granulepos"
 
-  external eos : t -> Ogg.Stream.t -> unit = "ocaml_theora_encode_eos"
+  external eos : t -> Ogg.Stream.stream -> unit = "ocaml_theora_encode_eos"
 end
 
 module Decoder =
@@ -192,7 +192,7 @@ struct
 
   external frames_of_granulepos : t -> Int64.t -> Int64.t = "ocaml_theora_decoder_frame_of_granulepos"
 
-  external get_yuv : t -> Ogg.Stream.t -> yuv_buffer = "ocaml_theora_decode_YUVout"
+  external get_yuv : t -> Ogg.Stream.stream -> yuv_buffer = "ocaml_theora_decode_YUVout"
 end
 
 module Skeleton = 

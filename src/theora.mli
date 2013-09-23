@@ -160,22 +160,22 @@ sig
   (**
     * Fills the given stream with the header packets.
     *)
-  val encode_header : t -> Ogg.Stream.t -> unit
+  val encode_header : t -> Ogg.Stream.stream -> unit
 
   (**
     * Encode data until a page is filled.
     *)
-  val encode_page : t -> Ogg.Stream.t -> (unit -> yuv_buffer) -> Ogg.Page.t
+  val encode_page : t -> Ogg.Stream.stream -> (unit -> yuv_buffer) -> Ogg.Page.t
 
   (** Encode a buffer. *)
-  val encode_buffer : t -> Ogg.Stream.t -> yuv_buffer -> unit
+  val encode_buffer : t -> Ogg.Stream.stream -> yuv_buffer -> unit
 
   (** Convert a granulepos to an absolute frame index, starting at 0.
     * The granulepos is interpreted in the context of a given theora_state handle. *)
   val frames_of_granulepos : t -> Int64.t -> Int64.t
 
   (** Set end of stream *)
-  val eos : t -> Ogg.Stream.t -> unit
+  val eos : t -> Ogg.Stream.stream -> unit
 end
 
 module Decoder :
@@ -212,14 +212,14 @@ sig
  (**
    * Output the next available frame of decoded YUV data. 
    *
-   * Raises [Ogg.Not_enough_data] if the Ogg.Stream.t which
+   * Raises [Ogg.Not_enough_data] if the Ogg.Stream.stream which
    * has been used to initialize the handler does not contain
    * enought data. You should submit a new page to it, and 
    * run this function again until it returns. 
    *
    * Raises [Not_initialized] if the decoder was not properly
    * initialized with [headerin]. *)
-  val get_yuv : t -> Ogg.Stream.t -> yuv_buffer
+  val get_yuv : t -> Ogg.Stream.stream -> yuv_buffer
 
   (** Convert a granulepos to an absolute frame index, starting at 0.
     * The granulepos is interpreted in the context of a given theora_state handle. *)
