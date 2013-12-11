@@ -56,7 +56,7 @@ let in_init () =
       try
         Decoder.headerin dec packet
       with
-        | Not_enough_data ->
+        | Ogg.Not_enough_data ->
           let rec g () =
              try
                let packet = Ogg.Stream.get_packet os in
@@ -66,7 +66,7 @@ let in_init () =
           in
           g ()
     in
-    let info,vendor,comments = f packet in
+    let dec,info,vendor,comments = f packet in
     serial,os,dec,info,vendor,comments
   in
   (** Now find a theora stream *)
@@ -102,10 +102,12 @@ let out_init info =
   let oc = open_out !outfile in
   let out s = output_string oc s; flush oc in
   let os = Ogg.Stream.create () in
+  let settings = { Encoder. keyframe_frequency = None; vp3_compatible = None; soft_target = None; buffer_delay = None; speed = None } in
   let comments = ["artitst", "test artist"; "title", "test title"] in
-  let t = Encoder.create info comments in
+  let t = Encoder.create info settings comments in
+  let s_o_p (h,b) = h ^ b in
     Encoder.encode_header t os;
-    out (Ogg.Stream.flush os);
+    out (s_o_p (Ogg.Stream.flush_page os));
     t,os,out
 
 let () =
@@ -135,12 +137,12 @@ let () =
             | None   -> raise Internal_error
          end
   in
+  let s_o_p (h,b) = h ^ b in
   Printf.printf "Starting transcoding loop !\n%!";
   begin
    try
     while true do
       let op = Encoder.encode_page enc os generator in
-      let s_o_p (h,b) = h ^ b in
       let op = s_o_p op in
         out op
     done
@@ -148,6 +150,6 @@ let () =
      | Ogg.Not_enough_data -> ()
   end ;
   Encoder.eos enc os;
-  out (Ogg.Stream.flush os);
+  out (s_o_p (Ogg.Stream.flush_page os));
   Unix.close fd;
   Gc.full_major ()
