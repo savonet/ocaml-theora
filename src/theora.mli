@@ -202,7 +202,7 @@ sig
     *
     * Returns an initialized decoder.
     *
-    * Raises [Ogg.Not_enought_data] is decoding header needs another packet.
+    * Raises [Ogg.Not_enough_data] is decoding header needs another packet.
     *
     * This function should be called with the first packets of the stream
     * until it returns the requested values. It may consume at most 5 packets
