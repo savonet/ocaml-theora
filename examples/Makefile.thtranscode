@@ -2,8 +2,6 @@ SOURCES=thtranscode.ml
 RESULT=thtranscode
 INCDIRS=../src ../../ocaml-ogg/src
 LIBS=unix bigarray ogg theora
-OCAMLC = /usr/bin/ocamlc -g 
-OCAMLOPT = /usr/bin/ocamlopt -g 
 ANNOTATE = true
 
 all: nc
