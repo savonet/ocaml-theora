@@ -1,6 +1,7 @@
 SOURCES=thtranscode.ml
 RESULT=thtranscode
-INCDIRS=../src ../../ocaml-ogg/src
+OCAMLOGG_DIR=../../ocaml-ogg/src
+INCDIRS=../src $(OCAMLOGG_DIR)
 LIBS=unix bigarray ogg theora
 ANNOTATE = true
 
