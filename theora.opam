@@ -1,25 +1,31 @@
 opam-version: "2.0"
-version: "dev"
+name: "theora"
+version: "0.3.1"
 maintainer: "Romain Beauxis <toots@rastageeks.org>"
 authors: "The Savonet Team <savonet-users@lists.sourceforge.net>"
 homepage: "https://github.com/savonet/ocaml-theora"
-bug-reports: "https://github.com/savonet/ocaml-theora/issues"
-depends: ["ocaml" "ocamlfind" "ogg"]
-flags: light-uninstall
+depends: [
+  "ocaml"
+  "ocamlfind" {build}
+  "ogg"
+]
 build: [
-  ["./bootstrap"]
+  ["./bootstrap"] {pinned}
   ["./configure" "--prefix" prefix]
-  [make "clean"]
+  [make "clean"] {pinned}
   [make]
 ]
 install: [make "install"]
-remove: ["ocamlfind" "remove" "theora"]
 depexts: [
+  ["libtheora-dev"] {os-distribution = "alpine"}
   ["libtheora-devel"] {os-distribution = "centos"}
   ["libtheora-devel"] {os-distribution = "fedora"}
-  ["libtheora-devel"] {os-distribution = "opensuse"}
+  ["libtheora-devel"] {os-family = "suse"}
   ["theora"] {os = "macos" & os-distribution = "homebrew"}
   ["libtheora-dev"] {os-distribution = "ubuntu"}
   ["libtheora-dev"] {os-distribution = "debian"}
 ]
+bug-reports: "https://github.com/savonet/ocaml-theora/issues"
 dev-repo: "git+https://github.com/savonet/ocaml-theora.git"
+synopsis:
+  "Bindings for the theora library to decode video files in theora format"
