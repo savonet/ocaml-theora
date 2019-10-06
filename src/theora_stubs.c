@@ -458,7 +458,8 @@ CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state, v
   th_ycbcr_buffer yb;
   ogg_packet op;
   int ret = 1;
-  assert(!ogg_stream_eos(os)); /* TODO: raise End_of_stream */
+  if (ogg_stream_eos(os))
+    caml_raise_constant(*caml_named_value("theora_exn_end_of_file"));
 
   /* Encode the theora packet. */
   yuv_of_val(frame,yb);

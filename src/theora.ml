@@ -37,7 +37,8 @@ let () =
   Callback.register_exception "theora_exn_inval" Invalid_data;
   Callback.register_exception "theora_exn_unknown" (Unknown_error 0) ;
   Callback.register_exception "theora_exn_dup_frame" Duplicate_frame ;
-  Callback.register_exception "theora_exn_not_enough_data" Ogg.Not_enough_data
+  Callback.register_exception "theora_exn_not_enough_data" Ogg.Not_enough_data;
+  Callback.register_exception "theora_exn_end_of_file" End_of_file
 
 external version_string : unit -> string = "ocaml_theora_version_string"
 
