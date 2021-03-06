@@ -1,6 +1,0 @@
-name="theora"
-version="@VERSION@"
-description="OCaml bindings for libtheora"
-requires="bigarray ogg"
-archive(byte)="theora.cma"
-archive(native)="theora.cmxa"
