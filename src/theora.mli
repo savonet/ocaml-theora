@@ -29,10 +29,13 @@
 
 (** General failure. *)
 exception Internal_error
+
 (** Library encountered invalid internal data. *)
 exception Invalid_data
+
 (** An unhandled error happened. *)
 exception Unknown_error of int
+
 (** The decoded packet represented a dropped frame.
   * The player can continue to display the current frame, 
   * as the contents of the decoded frame buffer have not 
@@ -41,6 +44,7 @@ exception Duplicate_frame
 
 (** Exceptions used by the decoding module. *)
 exception Done
+
 exception Not_initialized
 
 (** {2 General functions} *)
@@ -63,10 +67,10 @@ val is_keyframe : Ogg.Stream.packet -> bool
 
 (** A Colorspace. *)
 type colorspace =
-  | CS_unspecified (** The colorspace is unknown or unspecified *)
-  | CS_ITU_REC_470M (** This is the best option for 'NTSC' content *)
-  | CS_ITU_REC_470BG (** This is the best option for 'PAL' content *)
-  | CS_NSPACES (** This marks the end of the defined colorspaces *)
+  | CS_unspecified  (** The colorspace is unknown or unspecified *)
+  | CS_ITU_REC_470M  (** This is the best option for 'NTSC' content *)
+  | CS_ITU_REC_470BG  (** This is the best option for 'PAL' content *)
+  | CS_NSPACES  (** This marks the end of the defined colorspaces *)
 
 (**
   * A Chroma subsampling
@@ -76,37 +80,38 @@ type colorspace =
   * exact definitions.
   *)
 type pixelformat =
-  | PF_420 (** Chroma subsampling by 2 in each direction (4:2:0) *)
-  | PF_reserved (** Reserved value *)
-  | PF_422 (** Horizonatal chroma subsampling by 2 (4:2:2) *)
-  | PF_444 (** No chroma subsampling at all (4:4:4) *)
+  | PF_420  (** Chroma subsampling by 2 in each direction (4:2:0) *)
+  | PF_reserved  (** Reserved value *)
+  | PF_422  (** Horizonatal chroma subsampling by 2 (4:2:2) *)
+  | PF_444  (** No chroma subsampling at all (4:4:4) *)
 
 (** Theora bitstream info. *)
-type info =
-    {
-      frame_width : int; (** The encoded frame width.  *)
-      frame_height : int; (** The encoded frame height. *)
-      picture_width : int; (** The displayed picture width. *)
-      picture_height : int; (** The displayed picture height. *)
-      picture_x : int; (** The X offset of the displayed picture. *)
-      picture_y : int; (** The Y offset of the displayed picture. *)
-      colorspace : colorspace; (** The color space. *)
-      pixel_fmt  : pixelformat; (** The pixel format. *)
-      target_bitrate : int; (** The target bit-rate in bits per second. *)
-      quality        : int; (** The target quality level. *)
-      keyframe_granule_shift : int; (** The amount to shift to extract the last keyframe number from the granule position. *)
-      version_major : int;
-      version_minor : int;
-      version_subminor : int;
-      fps_numerator : int;
-      fps_denominator : int;
-      aspect_numerator : int;
-      aspect_denominator : int;
-    }
+type info = {
+  frame_width : int;  (** The encoded frame width.  *)
+  frame_height : int;  (** The encoded frame height. *)
+  picture_width : int;  (** The displayed picture width. *)
+  picture_height : int;  (** The displayed picture height. *)
+  picture_x : int;  (** The X offset of the displayed picture. *)
+  picture_y : int;  (** The Y offset of the displayed picture. *)
+  colorspace : colorspace;  (** The color space. *)
+  pixel_fmt : pixelformat;  (** The pixel format. *)
+  target_bitrate : int;  (** The target bit-rate in bits per second. *)
+  quality : int;  (** The target quality level. *)
+  keyframe_granule_shift : int;
+      (** The amount to shift to extract the last keyframe number from the granule position. *)
+  version_major : int;
+  version_minor : int;
+  version_subminor : int;
+  fps_numerator : int;
+  fps_denominator : int;
+  aspect_numerator : int;
+  aspect_denominator : int;
+}
 
 val default_granule_shift : int
 
-type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+type data_buffer =
+  (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
 (**
   * A YUV buffer for passing uncompressed frames to and from the codec.
@@ -122,40 +127,36 @@ type data_buffer = (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray
   * row from the top of the frame to the bottom. Within each row samples
   * are ordered from left to right.
   *)
-type yuv_buffer =
-    {
-      y_width : int;
-      y_height : int;
-      y_stride : int;
-      y : data_buffer;
-      u_width : int;
-      u_height : int;
-      u_stride : int;
-      u : data_buffer;
-      v_width : int;
-      v_height : int;
-      v_stride : int;
-      v : data_buffer;
-    }
+type yuv_buffer = {
+  y_width : int;
+  y_height : int;
+  y_stride : int;
+  y : data_buffer;
+  u_width : int;
+  u_height : int;
+  u_stride : int;
+  u : data_buffer;
+  v_width : int;
+  v_height : int;
+  v_stride : int;
+  v : data_buffer;
+}
 
 (** {2 Encoding} *)
 
-
-module Encoder :
-sig
+module Encoder : sig
   type t
 
-  type settings =
-    {
-      keyframe_frequency : int option ;
-      vp3_compatible     : bool option ;
-      soft_target        : bool option ;
-      buffer_delay       : int option ;
-      speed              : int option ;
-    }
+  type settings = {
+    keyframe_frequency : int option;
+    vp3_compatible : bool option;
+    soft_target : bool option;
+    buffer_delay : int option;
+    speed : int option;
+  }
 
   (** Initialize a [state] handle for decoding. *)
-  val create : info -> settings -> (string*string) list -> t
+  val create : info -> settings -> (string * string) list -> t
 
   (**
     * Fills the given stream with the header packets.
@@ -178,10 +179,10 @@ sig
   val eos : t -> Ogg.Stream.stream -> unit
 end
 
-module Decoder :
-sig
+module Decoder : sig
   (** Type for an uninitialized decoder. *)
   type decoder
+
   (** Type for an initialized decoder. *)
   type t
 
@@ -207,9 +208,10 @@ sig
     * This function should be called with the first packets of the stream
     * until it returns the requested values. It may consume at most 5 packets
     * (3 header packet, 1 additional packet and the initial video packet) *)
-  val headerin : decoder -> Ogg.Stream.packet -> t*info*string*((string*string) list)
+  val headerin :
+    decoder -> Ogg.Stream.packet -> t * info * string * (string * string) list
 
- (**
+  (**
    * Output the next available frame of decoded YUV data. 
    *
    * Raises [Ogg.Not_enough_data] if the Ogg.Stream.stream which
@@ -226,9 +228,7 @@ sig
   val frames_of_granulepos : t -> Int64.t -> Int64.t
 end
 
-module Skeleton : 
-sig
-
+module Skeleton : sig
   (** Generate a theora fisbone packet with
     * these parameters, to use in an ogg skeleton.
     * Default value for [start_granule] is [Int64.zero],
@@ -238,6 +238,8 @@ sig
   val fisbone :
     ?start_granule:Int64.t ->
     ?headers:(string * string) list ->
-    serialno:Nativeint.t -> info:info -> unit -> Ogg.Stream.packet
-
+    serialno:Nativeint.t ->
+    info:info ->
+    unit ->
+    Ogg.Stream.packet
 end
