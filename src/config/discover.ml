@@ -3,7 +3,7 @@ module C = Configurator.V1
 let () =
   C.main ~name:"theora-pkg-config" (fun c ->
       let default : C.Pkg_config.package_conf =
-        { libs = ["-ltheoraenc";"-ltheoradec"]; cflags = [] }
+        { libs = ["-ltheoraenc"; "-ltheoradec"]; cflags = [] }
       in
       let conf =
         match C.Pkg_config.get c with

@@ -466,38 +466,6 @@ CAMLprim value ocaml_theora_encode_buffer(value t_state, value o_stream_state,
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value ocaml_theora_encode_eos(value t_state, value o_stream_state) {
-  CAMLparam2(t_state, o_stream_state);
-  enc_state_t *state = Theora_enc_state_val(t_state);
-  ogg_stream_state *os = Stream_state_val(o_stream_state);
-  ogg_packet op;
-  int ret;
-  ogg_int64_t iframe;
-  ogg_int64_t pframe;
-
-  /* TODO: a proper eos should be acheived using an empty ogg page with the
-   * eos marker.. */
-
-  /* Try to grab a packet */
-  ret = th_encode_packetout(state->ts, 1, &op);
-  if (ret <= 0) {
-    check_err(ret);
-    /* No packet was produced: we bake our own ! */
-    op.packet = (unsigned char *)NULL;
-    op.bytes = 0;
-    op.b_o_s = 0;
-    op.e_o_s = 1;
-    /* Set the granulepos as a new frame */
-    iframe = state->granulepos >> state->ti.keyframe_granule_shift;
-    pframe = state->granulepos & ~iframe;
-    op.granulepos = (iframe << state->ti.keyframe_granule_shift) | (pframe + 1);
-    op.packetno = state->packetno + 1;
-  }
-  ogg_stream_packetin(os, &op);
-
-  CAMLreturn(Val_unit);
-}
-
 /** Decoding API **/
 
 typedef struct dec_state_t {

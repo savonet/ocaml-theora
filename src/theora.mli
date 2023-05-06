@@ -174,9 +174,6 @@ module Encoder : sig
   (** Convert a granulepos to an absolute frame index, starting at 0.
     * The granulepos is interpreted in the context of a given theora_state handle. *)
   val frames_of_granulepos : t -> Int64.t -> Int64.t
-
-  (** Set end of stream *)
-  val eos : t -> Ogg.Stream.stream -> unit
 end
 
 module Decoder : sig

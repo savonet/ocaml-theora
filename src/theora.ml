@@ -151,8 +151,6 @@ module Encoder = struct
 
   external frames_of_granulepos : t -> Int64.t -> Int64.t
     = "ocaml_theora_encoder_frame_of_granulepos"
-
-  external eos : t -> Ogg.Stream.stream -> unit = "ocaml_theora_encode_eos"
 end
 
 module Decoder = struct

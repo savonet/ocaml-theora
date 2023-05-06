@@ -139,7 +139,6 @@ let () =
       done
     with Ogg.Not_enough_data -> ()
   end;
-  Encoder.eos enc os;
-  out (s_o_p (Ogg.Stream.flush_page os));
+  List.iter (fun p -> out (s_o_p p)) (Ogg.Stream.terminate os);
   Unix.close fd;
   Gc.full_major ()
