@@ -1,5 +1,5 @@
 (lang dune 2.0)
-(version 0.5.0)
+(version 0.4.0)
 (name theora)
 (source (github savonet/ocaml-theora))
 (license GPL-2.0)
