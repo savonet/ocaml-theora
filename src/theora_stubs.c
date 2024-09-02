@@ -222,7 +222,7 @@ static void yuv_of_val(value v, th_ycbcr_buffer buffer) {
   buffer[0].height = Int_val(Field(v, i++));
   buffer[0].stride = Int_val(Field(v, i++));
   ba = Caml_ba_array_val(Field(v, i++));
-  if (ba->dim[0] != buffer[0].stride * buffer[0].height)
+  if (ba->dim[0] < buffer[0].stride * buffer[0].height)
     caml_raise_constant(*caml_named_value("theora_exn_inval"));
   buffer[0].data = (unsigned char *)ba->data;
 
@@ -231,7 +231,7 @@ static void yuv_of_val(value v, th_ycbcr_buffer buffer) {
   buffer[1].height = Int_val(Field(v, i++));
   buffer[1].stride = Int_val(Field(v, i++));
   ba = Caml_ba_array_val(Field(v, i++));
-  if (ba->dim[0] != buffer[1].stride * buffer[1].height)
+  if (ba->dim[0] < buffer[1].stride * buffer[1].height)
     caml_raise_constant(*caml_named_value("theora_exn_inval"));
   buffer[1].data = (unsigned char *)ba->data;
 
@@ -240,7 +240,7 @@ static void yuv_of_val(value v, th_ycbcr_buffer buffer) {
   buffer[2].height = Int_val(Field(v, i++));
   buffer[2].stride = Int_val(Field(v, i++));
   ba = Caml_ba_array_val(Field(v, i++));
-  if (ba->dim[0] != buffer[2].stride * buffer[2].height)
+  if (ba->dim[0] < buffer[2].stride * buffer[2].height)
     caml_raise_constant(*caml_named_value("theora_exn_inval"));
   buffer[2].data = (unsigned char *)ba->data;
 

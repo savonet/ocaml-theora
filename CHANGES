@@ -2,6 +2,7 @@
 =====
 * Deprecate `Encoder.eos`
 * Add more exceptions.
+* Fix boundary check for image buffers.
 
 0.4.0 (08-03-2021)
 ======
