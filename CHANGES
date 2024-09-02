@@ -1,6 +1,7 @@
 0.4.1 (unreleased)
 =====
 * Deprecate `Encoder.eos`
+* Add more exceptions.
 
 0.4.0 (08-03-2021)
 ======

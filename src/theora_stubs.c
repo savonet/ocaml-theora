@@ -50,14 +50,18 @@ static void check_err(int n) {
   case TH_EFAULT:
     caml_raise_constant(*caml_named_value("theora_exn_fault"));
 
-  /* TODO: finer-grained exc raising. */
   case TH_EINVAL:
-  case TH_EVERSION:
-  case TH_EBADPACKET:
-  case TH_ENOTFORMAT:
-  case TH_EBADHEADER:
-  case TH_EIMPL:
     caml_raise_constant(*caml_named_value("theora_exn_inval"));
+  case TH_EVERSION:
+    caml_raise_constant(*caml_named_value("theora_exn_version"));
+  case TH_EBADPACKET:
+    caml_raise_constant(*caml_named_value("theora_exn_bad_packet"));
+  case TH_ENOTFORMAT:
+    caml_raise_constant(*caml_named_value("theora_exn_notformat"));
+  case TH_EBADHEADER:
+    caml_raise_constant(*caml_named_value("theora_exn_bad_header"));
+  case TH_EIMPL:
+    caml_raise_constant(*caml_named_value("theora_exn_not_implemented"));
 
   case TH_DUPFRAME:
     caml_raise_constant(*caml_named_value("theora_exn_dup_frame"));

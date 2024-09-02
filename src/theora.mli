@@ -47,6 +47,11 @@ exception Done
 
 exception Not_initialized
 
+exception Bad_packet
+exception Header_not_theora
+exception Bad_header
+exception Not_implemented
+
 (** {2 General functions} *)
 
 (**

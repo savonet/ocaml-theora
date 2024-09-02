@@ -27,6 +27,11 @@
 
 exception Internal_error
 exception Invalid_data
+exception Bad_packet
+exception Header_not_theora
+exception Bad_header
+exception Not_implemented
+exception Bitstream_version_too_high
 exception Unknown_error of int
 exception Duplicate_frame
 exception Done
@@ -34,6 +39,11 @@ exception Not_initialized
 
 let () =
   Callback.register_exception "theora_exn_fault" Internal_error;
+  Callback.register_exception "theora_exn_version" Bitstream_version_too_high;
+  Callback.register_exception "theora_exn_bad_packet" Bad_packet;
+  Callback.register_exception "theora_exn_notformat" Header_not_theora;
+  Callback.register_exception "theora_exn_bad_header" Bad_header;
+  Callback.register_exception "theora_exn_not_implemented" Not_implemented;
   Callback.register_exception "theora_exn_inval" Invalid_data;
   Callback.register_exception "theora_exn_unknown" (Unknown_error 0);
   Callback.register_exception "theora_exn_dup_frame" Duplicate_frame;
