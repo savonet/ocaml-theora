@@ -1,4 +1,4 @@
-(lang dune 2.0)
+(lang dune 3.6)
 (version 0.4.1)
 (name theora)
 (source (github savonet/ocaml-theora))
