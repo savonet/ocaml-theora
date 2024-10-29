@@ -1,4 +1,4 @@
-0.4.1 (unreleased)
+0.4.1 (2024-10-29)
 =====
 * Deprecate `Encoder.eos`
 * Add more exceptions.
