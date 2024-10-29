@@ -10,7 +10,7 @@ bug-reports: "https://github.com/savonet/ocaml-theora/issues"
 depends: [
   "conf-libtheora"
   "conf-pkg-config"
-  "dune" {>= "3.6" & >= "2.0"}
+  "dune" {>= "3.6"}
   "dune-configurator"
   "ogg" {>= "0.7.0"}
   "odoc" {with-doc}

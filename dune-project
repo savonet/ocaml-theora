@@ -14,7 +14,7 @@
  (depends
   conf-libtheora
   conf-pkg-config
-  (dune (>= 2.0))
+  dune
   dune-configurator
   (ogg (>= 0.7.0)))
 )
