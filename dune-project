@@ -2,7 +2,7 @@
 (version 0.4.1)
 (name theora)
 (source (github savonet/ocaml-theora))
-(license GPL-2.0)
+(license GPL-2.0-only)
 (authors "The Savonet Team <savonet-users@lists.sourceforge.net>")
 (maintainers "The Savonet Team <savonet-users@lists.sourceforge.net>")
 
