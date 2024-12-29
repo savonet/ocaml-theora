@@ -1,3 +1,7 @@
+0.4.2 (unreleased)
+=====
+* Adapre to ocaml-ogg `0.8.0`
+
 0.4.1 (2024-10-29)
 =====
 * Deprecate `Encoder.eos`

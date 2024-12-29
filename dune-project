@@ -1,5 +1,5 @@
 (lang dune 3.6)
-(version 0.4.1)
+(version 0.4.2)
 (name theora)
 (source (github savonet/ocaml-theora))
 (license GPL-2.0-only)
@@ -16,5 +16,5 @@
   conf-pkg-config
   dune
   dune-configurator
-  (ogg (>= 0.7.0)))
+  (ogg (>= 0.8.0)))
 )

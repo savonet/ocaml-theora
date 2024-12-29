@@ -20,7 +20,7 @@
 
 let check = Theora.Decoder.check
 
-let decoder os =
+let decoder ~fill:_ os =
   let decoder = Theora.Decoder.create () in
   let data = ref None in
   let latest_yuv = ref None in
@@ -80,7 +80,7 @@ let decoder os =
       },
       m )
   in
-  let restart new_os = os := new_os in
+  let restart ~fill:_ new_os = os := new_os in
   let samples_of_granulepos pos =
     let decoder, _, _ = init () in
     Theora.Decoder.frames_of_granulepos decoder pos
